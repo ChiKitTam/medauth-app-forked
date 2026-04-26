@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { CSSProperties, useMemo, useState } from "react";
 import {
   ArrowLeft,
   Bell,
@@ -25,7 +25,6 @@ import {
   User,
   Wifi,
   WifiOff,
-  Building2,
 } from "lucide-react";
 
 const COLORS = {
@@ -44,14 +43,57 @@ const ROLE_META = {
   consumer: { label: "Consumer", icon: User },
   pharmacist: { label: "Pharmacist", icon: Pill },
   healthcare: { label: "Healthcare Professional", icon: Stethoscope },
-  manufacturer: { label: "Manufacturer", icon: Building2 },
-  regulator: { label: "Regulatory Authority", icon: Landmark },
-  admin: { label: "Administrator", icon: Settings },
+  regulator: { label: "Regulatory Officer", icon: Landmark },
+  admin: { label: "Admin", icon: Settings },
 };
 
-const INITIAL_USERS = [
+type UserRole = keyof typeof ROLE_META;
+type Screen =
+  | "home"
+  | "scan"
+  | "history"
+  | "alerts"
+  | "reports"
+  | "settings"
+  | "result"
+  | "report"
+  | "offline";
+type VerificationStatus = "Authentic" | "Suspicious" | "Counterfeit";
+type User = {
+  name: string;
+  email: string;
+  password?: string;
+  role: UserRole;
+};
+type HistoryItem = {
+  id: string;
+  medicine: string;
+  batch: string;
+  status: VerificationStatus;
+  date: string;
+};
+type VerificationResult = {
+  medicine: string;
+  batch: string;
+  manufacturer: string;
+  expiry: string;
+  status: VerificationStatus;
+  confidence: string;
+};
+type AlertItem = {
+  id: string;
+  message: string;
+  severity: "High" | "Medium" | "Low";
+};
+type ReportItem = {
+  id: string;
+  title: string;
+  date: string;
+};
+
+const INITIAL_USERS: User[] = [
   {
-    name: "Hannah ",
+    name: "Hannah Consumer",
     email: "consumer@wissenmedauth.app",
     password: "consumer123",
     role: "consumer",
@@ -69,13 +111,7 @@ const INITIAL_USERS = [
     role: "healthcare",
   },
   {
-    name: "George Manufacturer ",
-    email: "manufacturer@wissenmedauth.app",
-    password: "maker123",
-    role: "manufacturer",
-  },
-  {
-    name: "Regulator User",
+    name: "Riley Regulator",
     email: "regulator@wissenmedauth.app",
     password: "reg123",
     role: "regulator",
@@ -88,7 +124,7 @@ const INITIAL_USERS = [
   },
 ];
 
-const INITIAL_HISTORY = [
+const INITIAL_HISTORY: HistoryItem[] = [
   {
     id: "VH-1001",
     medicine: "Paracetamol 500mg",
@@ -112,7 +148,7 @@ const INITIAL_HISTORY = [
   },
 ];
 
-const ALERTS = [
+const ALERTS: AlertItem[] = [
   {
     id: "AL-401",
     message: "Suspicious batch detected in Manila",
@@ -130,7 +166,7 @@ const ALERTS = [
   },
 ];
 
-const REPORTS = [
+const REPORTS: ReportItem[] = [
   { id: "RP-301", title: "Counterfeit activity summary", date: "2026-04-21" },
   { id: "RP-302", title: "Regional verification report", date: "2026-04-20" },
   { id: "RP-303", title: "Batch incident overview", date: "2026-04-19" },
@@ -145,7 +181,7 @@ const NAV_META = {
   settings: { label: "Settings", icon: Settings },
 };
 
-function getStatusConfig(status) {
+function getStatusConfig(status: VerificationStatus) {
   if (status === "Authentic") {
     return {
       icon: ShieldCheck,
@@ -170,19 +206,24 @@ function getStatusConfig(status) {
   };
 }
 
-function getNavItems(role, isGuest) {
+function getNavItems(role: UserRole, isGuest: boolean): Screen[] {
   if (isGuest) return ["home", "scan", "settings"];
   if (role === "consumer") return ["home", "scan", "history", "settings"];
   if (role === "pharmacist" || role === "healthcare") {
     return ["home", "scan", "history", "alerts", "settings"];
   }
-  if (role === "manufacturer" || role === "regulator" || role === "admin") {
+  if (role === "regulator" || role === "admin") {
     return ["home", "reports", "alerts", "settings"];
   }
   return ["home", "scan", "settings"];
 }
 
-function getScreenTitle(screen, roleLabel) {
+function getDashboardScreen(role: UserRole): Screen {
+  if (role === "regulator" || role === "admin") return "reports";
+  return "home";
+}
+
+function getScreenTitle(screen: Screen, roleLabel: string) {
   if (screen === "home") return "Dashboard";
   if (screen === "scan") return "Medication Scan";
   if (screen === "result") return "Verification Result";
@@ -195,16 +236,17 @@ function getScreenTitle(screen, roleLabel) {
 }
 
 export default function App() {
-  const [users, setUsers] = useState(INITIAL_USERS);
+  const [users, setUsers] = useState<User[]>(INITIAL_USERS);
   const [authMode, setAuthMode] = useState("welcome");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isGuest, setIsGuest] = useState(false);
-  const [currentUser, setCurrentUser] = useState(null);
-  const [screen, setScreen] = useState("home");
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [screen, setScreen] = useState<Screen>("home");
   const [online, setOnline] = useState(true);
 
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
+  const [loginRole, setLoginRole] = useState<UserRole | "">("");
   const [loginError, setLoginError] = useState("");
 
   const [signupName, setSignupName] = useState("");
@@ -223,9 +265,9 @@ export default function App() {
   const [scanInput, setScanInput] = useState("");
   const [reportText, setReportText] = useState("");
   const [reportSubmitted, setReportSubmitted] = useState(false);
-  const [history, setHistory] = useState(INITIAL_HISTORY);
+  const [history, setHistory] = useState<HistoryItem[]>(INITIAL_HISTORY);
 
-  const [verificationResult, setVerificationResult] = useState({
+  const [verificationResult, setVerificationResult] = useState<VerificationResult>({
     medicine: "Paracetamol 500mg",
     batch: "B-84921",
     manufacturer: "WissenMedAuth Pharma",
@@ -253,26 +295,41 @@ export default function App() {
     const email = loginEmail.trim().toLowerCase();
     const password = loginPassword.trim();
 
-    if (!email || !password) {
-      setLoginError("Please enter your email and password.");
+    if (!email) {
+      setLoginError("Email is required.");
+      return;
+    }
+
+    if (!password) {
+      setLoginError("Password is required.");
+      return;
+    }
+
+    if (!loginRole) {
+      setLoginError("Please select a role.");
       return;
     }
 
     const matchedUser = users.find(
-      (user) => user.email.toLowerCase() === email && user.password === password
+      (user) =>
+        user.email.toLowerCase() === email &&
+        user.password === password &&
+        user.role === loginRole
     );
 
     if (!matchedUser) {
-      setLoginError("Invalid email or password. Please try again.");
+      setLoginError("The credentials do not match the selected access role.");
       return;
     }
 
     setCurrentUser(matchedUser);
     setIsGuest(false);
     setIsLoggedIn(true);
-    setScreen("home");
+    setScreen(getDashboardScreen(loginRole));
     setAuthMode("welcome");
     setLoginError("");
+    localStorage.setItem("medauthSelectedRole", loginRole);
+    localStorage.setItem("medauthDashboard", getDashboardScreen(loginRole));
   };
 
   const handleGuest = () => {
@@ -310,7 +367,7 @@ export default function App() {
       name,
       email,
       password,
-      role: "consumer",
+      role: "consumer" as const,
     };
 
     setUsers((prev) => [...prev, newUser]);
@@ -364,6 +421,9 @@ export default function App() {
     setScreen("home");
     setAuthMode("welcome");
     setLoginPassword("");
+    setLoginRole("");
+    localStorage.removeItem("medauthSelectedRole");
+    localStorage.removeItem("medauthDashboard");
     resetAuthMessages();
   };
 
@@ -384,7 +444,7 @@ export default function App() {
       return;
     }
 
-    let result;
+    let result: VerificationResult;
     if (input.includes("fake") || input.includes("x9")) {
       result = {
         medicine: "Unknown Product",
@@ -443,87 +503,19 @@ export default function App() {
       <div style={styles.appShell}>
         <PhoneFrame>
           <StatusBar online={online} />
-
-          {authMode === "welcome" && (
-            <WelcomeScreen
-              onLogin={() => {
-                resetAuthMessages();
-                setAuthMode("login");
-              }}
-              onSignup={() => {
-                resetAuthMessages();
-                setAuthMode("signup");
-              }}
-              onGuest={handleGuest}
-            />
-          )}
-
-          {authMode === "login" && (
-            <AuthScreen
-              title="Welcome back"
-              subtitle="Log in to access your assigned WissenMedAuth workspace"
-              email={loginEmail}
-              setEmail={setLoginEmail}
-              password={loginPassword}
-              setPassword={setLoginPassword}
-              showPassword={showPassword}
-              setShowPassword={setShowPassword}
-              error={loginError}
-              onBack={() => {
-                resetAuthMessages();
-                setAuthMode("welcome");
-              }}
-              onPrimary={handleLogin}
-              primaryLabel="Log In"
-              secondaryLabel="Create Account"
-              onSecondary={() => {
-                resetAuthMessages();
-                setAuthMode("signup");
-              }}
-              onForgot={() => {
-                resetAuthMessages();
-                setAuthMode("forgot");
-              }}
-            />
-          )}
-
-          {authMode === "signup" && (
-            <SignUpScreen
-              name={signupName}
-              setName={setSignupName}
-              email={signupEmail}
-              setEmail={setSignupEmail}
-              password={signupPassword}
-              setPassword={setSignupPassword}
-              showPassword={showPassword}
-              setShowPassword={setShowPassword}
-              error={signupError}
-              success={signupSuccess}
-              onBack={() => {
-                resetAuthMessages();
-                setAuthMode("welcome");
-              }}
-              onCreate={handleSignup}
-            />
-          )}
-
-          {authMode === "forgot" && (
-            <ForgotPasswordScreen
-              forgotEmail={forgotEmail}
-              setForgotEmail={setForgotEmail}
-              newForgotPassword={newForgotPassword}
-              setNewForgotPassword={setNewForgotPassword}
-              forgotError={forgotError}
-              forgotMessage={forgotMessage}
-              showPassword={showPassword}
-              setShowPassword={setShowPassword}
-              onBack={() => {
-                resetAuthMessages();
-                setAuthMode("login");
-              }}
-              onReset={handleForgotPassword}
-            />
-          )}
+          <AppLoginScreen
+            email={loginEmail}
+            setEmail={setLoginEmail}
+            password={loginPassword}
+            setPassword={setLoginPassword}
+            role={loginRole}
+            setRole={setLoginRole}
+            showPassword={showPassword}
+            setShowPassword={setShowPassword}
+            error={loginError}
+            onLogin={handleLogin}
+            onGuest={handleGuest}
+          />
         </PhoneFrame>
       </div>
     );
@@ -625,7 +617,136 @@ export default function App() {
   );
 }
 
-function PhoneFrame({ children }) {
+function AppLoginScreen({
+  email,
+  setEmail,
+  password,
+  setPassword,
+  role,
+  setRole,
+  showPassword,
+  setShowPassword,
+  error,
+  onLogin,
+  onGuest,
+}: any) {
+  const roleOptions = Object.entries(ROLE_META) as [
+    UserRole,
+    (typeof ROLE_META)[UserRole]
+  ][];
+
+  return (
+    <div className="app-login-screen" style={styles.appLoginScreen}>
+      <div className="app-login-top" style={styles.appLoginTop}>
+        <div style={styles.appLogoRow}>
+          <div className="app-logo-mark" style={styles.appLogoMark}>
+            <ShieldCheck size={28} color={COLORS.card} />
+          </div>
+          <div>
+            <div style={styles.appLoginKicker}>Identity Gateway</div>
+            <h1 style={styles.appLoginTitle}>MedAuth</h1>
+            <p style={styles.appLoginSubtitle}>
+              Enterprise medicine verification and compliance access
+            </p>
+          </div>
+        </div>
+
+        <div style={styles.enterpriseStatusRow}>
+          <div className="enterprise-status-chip" style={styles.enterpriseStatusChip}>
+            <ShieldCheck size={14} color={COLORS.success} />
+            <span>Verified access</span>
+          </div>
+          <div className="enterprise-status-chip" style={styles.enterpriseStatusChip}>
+            <Lock size={14} color={COLORS.primary} />
+            <span>Secure session</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="app-login-card">
+        <Card style={styles.appLoginCard}>
+          <div style={styles.loginCardHeader}>
+            <div>
+              <div style={styles.cardTitle}>Sign in</div>
+              <div style={styles.loginCardSubtitle}>
+                Access your assigned compliance workspace.
+              </div>
+            </div>
+            <ShieldCheck size={22} color={COLORS.success} />
+          </div>
+
+          <div style={styles.inputWrap}>
+            <div style={styles.inputLabel}>Select role</div>
+            <div style={styles.roleOptionList}>
+              {roleOptions.map(([key, meta], index) => {
+                const Icon = meta.icon;
+                const selected = role === key;
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    className="role-option-motion"
+                    onClick={() => setRole(key)}
+                    style={{
+                      ...styles.roleOptionButton,
+                      ...(selected ? styles.roleOptionButtonActive : {}),
+                      animationDelay: `${120 + index * 45}ms`,
+                    }}
+                    aria-pressed={selected}
+                  >
+                    <Icon
+                      size={17}
+                      color={selected ? COLORS.card : COLORS.primary}
+                    />
+                    <span>{meta.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <Input
+            label="Email"
+            value={email}
+            onChange={setEmail}
+            placeholder="Enter work email"
+          />
+
+          <PasswordInput
+            label="Password"
+            value={password}
+            onChange={setPassword}
+            placeholder="Enter password"
+            showPassword={showPassword}
+            onToggle={() => setShowPassword((v: boolean) => !v)}
+          />
+
+          {error ? <div style={styles.errorText}>{error}</div> : null}
+
+          <div className="login-submit-motion">
+            <PrimaryButton
+              label="Continue to Dashboard"
+              onClick={onLogin}
+              icon={Lock}
+            />
+          </div>
+
+          <button
+            type="button"
+            className="guest-access-button"
+            style={styles.guestAccessButton}
+            onClick={onGuest}
+          >
+            <User size={16} color={COLORS.primary} />
+            <span>Continue with Guest Access</span>
+          </button>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function PhoneFrame({ children }: any) {
   return (
     <div style={styles.phoneOuter}>
       <div style={styles.phoneNotch} />
@@ -634,7 +755,7 @@ function PhoneFrame({ children }) {
   );
 }
 
-function StatusBar({ online }) {
+function StatusBar({ online }: any) {
   return (
     <div style={styles.statusBar}>
       <span>9:41</span>
@@ -646,7 +767,7 @@ function StatusBar({ online }) {
   );
 }
 
-function TopBar({ title, onBack }) {
+function TopBar({ title, onBack }: any) {
   return (
     <div style={styles.topBar}>
       <div style={styles.topBarSide}>
@@ -664,7 +785,7 @@ function TopBar({ title, onBack }) {
   );
 }
 
-function WelcomeScreen({ onLogin, onSignup, onGuest }) {
+function WelcomeScreen({ onLogin, onSignup, onGuest }: any) {
   return (
     <div style={styles.authContainer}>
       <div style={styles.brandBlock}>
@@ -713,7 +834,7 @@ function AuthScreen({
   secondaryLabel,
   onSecondary,
   onForgot,
-}) {
+}: any) {
   return (
     <div style={styles.authContainer}>
       <IconButton icon={ArrowLeft} onClick={onBack} />
@@ -735,7 +856,7 @@ function AuthScreen({
           onChange={setPassword}
           placeholder="Enter your password"
           showPassword={showPassword}
-          onToggle={() => setShowPassword((v) => !v)}
+          onToggle={() => setShowPassword((v: boolean) => !v)}
         />
         {error ? <div style={styles.errorText}>{error}</div> : null}
         <button style={styles.simpleLink} onClick={onForgot}>
@@ -764,7 +885,7 @@ function SignUpScreen({
   success,
   onBack,
   onCreate,
-}) {
+}: any) {
   return (
     <div style={styles.authContainer}>
       <IconButton icon={ArrowLeft} onClick={onBack} />
@@ -794,7 +915,7 @@ function SignUpScreen({
           onChange={setPassword}
           placeholder="Create a password"
           showPassword={showPassword}
-          onToggle={() => setShowPassword((v) => !v)}
+          onToggle={() => setShowPassword((v: boolean) => !v)}
         />
 
         <div style={styles.helperText}></div>
@@ -818,7 +939,7 @@ function ForgotPasswordScreen({
   setShowPassword,
   onBack,
   onReset,
-}) {
+}: any) {
   return (
     <div style={styles.authContainer}>
       <IconButton icon={ArrowLeft} onClick={onBack} />
@@ -842,7 +963,7 @@ function ForgotPasswordScreen({
           onChange={setNewForgotPassword}
           placeholder="Enter your new password"
           showPassword={showPassword}
-          onToggle={() => setShowPassword((v) => !v)}
+          onToggle={() => setShowPassword((v: boolean) => !v)}
         />
         {forgotError ? <div style={styles.errorText}>{forgotError}</div> : null}
         {forgotMessage ? (
@@ -863,7 +984,7 @@ function HomeScreen({
   isGuest,
   currentRole,
   onGuestBack,
-}) {
+}: any) {
   const RoleIcon = roleMeta.icon;
 
   const features = [
@@ -967,7 +1088,7 @@ function HomeScreen({
   );
 }
 
-function ScanScreen({ scanInput, setScanInput, onVerify, online }) {
+function ScanScreen({ scanInput, setScanInput, onVerify, online }: any) {
   return (
     <div style={styles.stackGapLg}>
       <Card>
@@ -997,7 +1118,7 @@ function ScanScreen({ scanInput, setScanInput, onVerify, online }) {
   );
 }
 
-function ResultScreen({ result, role, isGuest, onReport }) {
+function ResultScreen({ result, role, isGuest, onReport }: any) {
   const config = getStatusConfig(result.status);
   const Icon = config.icon;
 
@@ -1045,7 +1166,7 @@ function ReportScreen({
   setReportText,
   onSubmit,
   reportSubmitted,
-}) {
+}: any) {
   return (
     <div style={styles.stackGapLg}>
       <Card>
@@ -1070,7 +1191,7 @@ function ReportScreen({
   );
 }
 
-function OfflineScreen({ onSync }) {
+function OfflineScreen({ onSync }: any) {
   return (
     <div style={styles.stackGapLg}>
       <Card>
@@ -1095,10 +1216,10 @@ function OfflineScreen({ onSync }) {
   );
 }
 
-function HistoryScreen({ history }) {
+function HistoryScreen({ history }: any) {
   return (
     <div style={styles.stackGapLg}>
-      {history.map((item) => {
+      {history.map((item: HistoryItem) => {
         const cfg = getStatusConfig(item.status);
         return (
           <Card key={item.id}>
@@ -1126,13 +1247,13 @@ function HistoryScreen({ history }) {
   );
 }
 
-function AlertsScreen({ alerts, roleLabel }) {
+function AlertsScreen({ alerts, roleLabel }: any) {
   return (
     <div style={styles.stackGapLg}>
       <Card>
         <div style={styles.cardTitle}>{roleLabel} Alerts</div>
         <div style={styles.featureList}>
-          {alerts.map((alert) => (
+          {alerts.map((alert: AlertItem) => (
             <div key={alert.id} style={styles.alertRow}>
               <TriangleAlert
                 size={18}
@@ -1158,12 +1279,12 @@ function AlertsScreen({ alerts, roleLabel }) {
   );
 }
 
-function ReportsScreen({ reports, roleLabel }) {
+function ReportsScreen({ reports, roleLabel }: any) {
   return (
     <div style={styles.stackGapLg}>
       <Card>
         <div style={styles.cardTitle}>{roleLabel} Reports</div>
-        {reports.map((report) => (
+        {reports.map((report: ReportItem) => (
           <div key={report.id} style={styles.reportRow}>
             <FileText size={18} color={COLORS.primary} />
             <div>
@@ -1179,7 +1300,7 @@ function ReportsScreen({ reports, roleLabel }) {
   );
 }
 
-function SettingsScreen({ roleLabel, name, email, isGuest, onLogout }) {
+function SettingsScreen({ roleLabel, name, email, isGuest, onLogout }: any) {
   return (
     <div style={styles.stackGapLg}>
       <Card>
@@ -1210,7 +1331,7 @@ function SettingsScreen({ roleLabel, name, email, isGuest, onLogout }) {
   );
 }
 
-function BottomNav({ navItems, active, onChange }) {
+function BottomNav({ navItems, active, onChange }: any) {
   return (
     <div
       style={{
@@ -1218,7 +1339,7 @@ function BottomNav({ navItems, active, onChange }) {
         gridTemplateColumns: `repeat(${navItems.length}, 1fr)`,
       }}
     >
-      {navItems.map((key) => {
+      {navItems.map((key: keyof typeof NAV_META) => {
         const item = NAV_META[key];
         const Icon = item.icon;
         const selected = key === active;
@@ -1243,7 +1364,7 @@ function BottomNav({ navItems, active, onChange }) {
   );
 }
 
-function QuickAction({ icon: Icon, label, onClick }) {
+function QuickAction({ icon: Icon, label, onClick }: any) {
   return (
     <button onClick={onClick} style={styles.quickAction}>
       <div style={styles.quickIcon}>
@@ -1254,11 +1375,11 @@ function QuickAction({ icon: Icon, label, onClick }) {
   );
 }
 
-function Card({ children, style = {} }) {
+function Card({ children, style = {} }: any) {
   return <div style={{ ...styles.card, ...style }}>{children}</div>;
 }
 
-function IconButton({ icon: Icon, onClick }) {
+function IconButton({ icon: Icon, onClick }: any) {
   return (
     <button onClick={onClick} style={styles.iconButton}>
       <Icon size={18} color={COLORS.text} />
@@ -1266,7 +1387,7 @@ function IconButton({ icon: Icon, onClick }) {
   );
 }
 
-function PrimaryButton({ label, onClick, disabled = false, icon: Icon }) {
+function PrimaryButton({ label, onClick, disabled = false, icon: Icon }: any) {
   return (
     <button
       onClick={onClick}
@@ -1279,7 +1400,7 @@ function PrimaryButton({ label, onClick, disabled = false, icon: Icon }) {
   );
 }
 
-function SecondaryButton({ label, onClick, icon: Icon }) {
+function SecondaryButton({ label, onClick, icon: Icon }: any) {
   return (
     <button onClick={onClick} style={styles.secondaryBtn}>
       {Icon ? <Icon size={16} color={COLORS.primary} /> : null}
@@ -1288,7 +1409,7 @@ function SecondaryButton({ label, onClick, icon: Icon }) {
   );
 }
 
-function TextButton({ label, onClick }) {
+function TextButton({ label, onClick }: any) {
   return (
     <button onClick={onClick} style={styles.textBtn}>
       {label}
@@ -1303,7 +1424,7 @@ function Input({
   placeholder,
   icon: Icon,
   readOnly = false,
-}) {
+}: any) {
   return (
     <div style={styles.inputWrap}>
       <div style={styles.inputLabel}>{label}</div>
@@ -1328,7 +1449,7 @@ function PasswordInput({
   placeholder,
   showPassword,
   onToggle,
-}) {
+}: any) {
   return (
     <div style={styles.inputWrap}>
       <div style={styles.inputLabel}>{label}</div>
@@ -1353,7 +1474,7 @@ function PasswordInput({
   );
 }
 
-function TextArea({ label, value, onChange, placeholder }) {
+function TextArea({ label, value, onChange, placeholder }: any) {
   return (
     <div style={styles.inputWrap}>
       <div style={styles.inputLabel}>{label}</div>
@@ -1368,7 +1489,7 @@ function TextArea({ label, value, onChange, placeholder }) {
   );
 }
 
-function InfoRow({ label, value }) {
+function InfoRow({ label, value }: any) {
   return (
     <div style={styles.infoRow}>
       <div style={styles.infoLabel}>{label}</div>
@@ -1377,7 +1498,7 @@ function InfoRow({ label, value }) {
   );
 }
 
-function SettingRow({ icon: Icon, label }) {
+function SettingRow({ icon: Icon, label }: any) {
   return (
     <div style={styles.settingRow}>
       <div style={styles.settingLeft}>
@@ -1393,7 +1514,7 @@ function SettingRow({ icon: Icon, label }) {
   );
 }
 
-const styles = {
+const styles: Record<string, CSSProperties> = {
   appShell: {
     minHeight: "100vh",
     background: `linear-gradient(180deg, ${COLORS.bg} 0%, #EAF1FB 100%)`,
@@ -1472,6 +1593,139 @@ const styles = {
     flex: 1,
     overflowY: "auto",
     padding: "0 16px 12px 16px",
+  },
+  appLoginScreen: {
+    height: "calc(100% - 40px)",
+    overflowY: "auto",
+    padding: "28px 18px 18px 18px",
+    display: "flex",
+    flexDirection: "column",
+    gap: 18,
+    background:
+      "linear-gradient(180deg, #F8FBFD 0%, #F3F7FA 48%, #EEF4F8 100%)",
+  },
+  appLoginTop: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 16,
+  },
+  appLogoRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
+  },
+  appLogoMark: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    background: `linear-gradient(135deg, ${COLORS.primary}, ${COLORS.success})`,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    boxShadow: "0 14px 26px rgba(47, 128, 237, 0.24)",
+    flexShrink: 0,
+  },
+  appLoginKicker: {
+    color: COLORS.success,
+    fontSize: 11,
+    fontWeight: 900,
+    textTransform: "uppercase",
+    marginBottom: 5,
+  },
+  appLoginTitle: {
+    margin: 0,
+    fontSize: 30,
+    lineHeight: 1,
+    fontWeight: 900,
+    color: COLORS.text,
+  },
+  appLoginSubtitle: {
+    margin: "6px 0 0 0",
+    color: COLORS.subtext,
+    fontSize: 13,
+    lineHeight: 1.4,
+  },
+  enterpriseStatusRow: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: 8,
+  },
+  enterpriseStatusChip: {
+    minHeight: 40,
+    borderRadius: 14,
+    border: "1px solid rgba(47, 128, 237, 0.12)",
+    background: "rgba(255,255,255,0.84)",
+    color: COLORS.text,
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    padding: "0 10px",
+    fontSize: 11,
+    fontWeight: 800,
+    boxShadow: "0 8px 18px rgba(15, 23, 42, 0.04)",
+  },
+  appLoginCard: {
+    borderRadius: 20,
+    border: "1px solid rgba(214, 224, 230, 0.92)",
+    boxShadow: "0 18px 42px rgba(15, 23, 42, 0.1)",
+  },
+  loginCardHeader: {
+    display: "flex",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 14,
+  },
+  loginCardSubtitle: {
+    color: COLORS.subtext,
+    fontSize: 12,
+    fontWeight: 600,
+    marginTop: -6,
+    lineHeight: 1.4,
+  },
+  roleOptionList: {
+    display: "grid",
+    gridTemplateColumns: "1fr",
+    gap: 8,
+  },
+  roleOptionButton: {
+    minHeight: 46,
+    borderRadius: 14,
+    border: `1px solid ${COLORS.border}`,
+    background: "#FBFCFD",
+    color: COLORS.text,
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    padding: "0 12px",
+    fontWeight: 800,
+    fontSize: 13,
+    cursor: "pointer",
+    textAlign: "left",
+    transition:
+      "transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease, background 160ms ease",
+  },
+  roleOptionButtonActive: {
+    background: COLORS.primary,
+    borderColor: COLORS.primary,
+    color: COLORS.card,
+    boxShadow: "0 10px 18px rgba(47, 128, 237, 0.22)",
+  },
+  guestAccessButton: {
+    width: "100%",
+    minHeight: 48,
+    marginTop: 12,
+    borderRadius: 16,
+    border: `1px solid ${COLORS.border}`,
+    background: COLORS.card,
+    color: COLORS.primary,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    fontWeight: 800,
+    fontSize: 13,
+    cursor: "pointer",
   },
   authContainer: {
     padding: 20,
