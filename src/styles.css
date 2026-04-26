@@ -29,6 +29,17 @@ textarea {
   opacity: 0.9;
 }
 
+.app-login-screen::after {
+  content: "";
+  position: absolute;
+  inset: auto 18px 20px 18px;
+  height: 180px;
+  pointer-events: none;
+  background: linear-gradient(135deg, rgba(47, 128, 237, 0.1), rgba(39, 174, 96, 0.1));
+  border-radius: 28px;
+  filter: blur(22px);
+}
+
 .app-login-screen > * {
   position: relative;
 }
@@ -49,8 +60,12 @@ textarea {
   animation-delay: 90ms;
 }
 
-.app-login-card {
+.app-login-card-wrap {
   animation: cardIn 560ms cubic-bezier(0.2, 0.8, 0.2, 1) 120ms both;
+}
+
+.app-login-card-wrap > div {
+  animation: floatingCard 5s ease-in-out 900ms infinite;
 }
 
 .role-option-motion {
@@ -65,6 +80,28 @@ textarea {
 
 .role-option-motion:active {
   transform: translateY(0) scale(0.99);
+}
+
+.role-selected-check {
+  animation: selectedPop 220ms ease both;
+  flex-shrink: 0;
+}
+
+.input-box-motion {
+  transition:
+    transform 170ms ease,
+    border-color 170ms ease,
+    box-shadow 170ms ease,
+    background 170ms ease;
+}
+
+.input-box-motion:focus-within {
+  transform: translateY(-1px);
+  border-color: rgba(47, 128, 237, 0.62) !important;
+  background: #ffffff !important;
+  box-shadow:
+    0 0 0 4px rgba(47, 128, 237, 0.1),
+    0 12px 22px rgba(15, 23, 42, 0.06);
 }
 
 .login-submit-motion button {
@@ -82,6 +119,40 @@ textarea {
 
 .login-submit-motion button:active {
   transform: translateY(0) scale(0.99);
+}
+
+.primary-button-motion,
+.secondary-button-motion {
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    filter 160ms ease,
+    border-color 160ms ease;
+}
+
+.primary-button-motion:hover:not(:disabled),
+.secondary-button-motion:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: saturate(1.04);
+}
+
+.primary-button-motion:active:not(:disabled),
+.secondary-button-motion:active:not(:disabled) {
+  transform: translateY(0) scale(0.99);
+}
+
+.primary-button-motion:disabled,
+.guest-access-button:disabled {
+  cursor: wait !important;
+}
+
+.login-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.45);
+  border-top-color: #ffffff;
+  border-radius: 999px;
+  animation: spin 720ms linear infinite;
 }
 
 .guest-access-button {
@@ -134,6 +205,16 @@ textarea {
   }
 }
 
+@keyframes floatingCard {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
 @keyframes roleIn {
   from {
     opacity: 0;
@@ -142,6 +223,17 @@ textarea {
   to {
     opacity: 1;
     transform: translateX(0);
+  }
+}
+
+@keyframes selectedPop {
+  from {
+    opacity: 0;
+    transform: scale(0.72);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
   }
 }
 
@@ -156,6 +248,12 @@ textarea {
   }
 }
 
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 @keyframes logoBreathe {
   0%,
   100% {
@@ -163,6 +261,36 @@ textarea {
   }
   50% {
     box-shadow: 0 16px 32px rgba(39, 174, 96, 0.28);
+  }
+}
+
+@media (max-width: 520px) {
+  body {
+    background: #f5f7fa;
+  }
+
+  .phone-frame {
+    width: 100vw !important;
+    height: 100vh !important;
+    min-height: 100vh;
+    border-radius: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    background: #f5f7fa !important;
+  }
+
+  .phone-frame > div:first-child {
+    display: none;
+  }
+
+  .phone-frame > div:last-child {
+    border-radius: 0 !important;
+  }
+}
+
+@media (min-width: 521px) and (max-height: 900px) {
+  .phone-frame {
+    transform: scale(0.92);
   }
 }
 

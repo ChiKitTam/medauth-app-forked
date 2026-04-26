@@ -1,9 +1,11 @@
-import React, { CSSProperties, useMemo, useState } from "react";
+import React, { CSSProperties, useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   Bell,
+  Bot,
   Camera,
   CheckCircle2,
+  ClipboardCheck,
   Eye,
   EyeOff,
   FileText,
@@ -15,16 +17,19 @@ import {
   LogOut,
   Pill,
   Search,
+  Send,
   Settings,
   ShieldAlert,
   ShieldCheck,
   ShieldX,
+  Sparkles,
   Stethoscope,
   TriangleAlert,
   Upload,
   User,
   Wifi,
   WifiOff,
+  X,
 } from "lucide-react";
 
 const COLORS = {
@@ -40,11 +45,31 @@ const COLORS = {
 };
 
 const ROLE_META = {
-  consumer: { label: "Consumer", icon: User },
-  pharmacist: { label: "Pharmacist", icon: Pill },
-  healthcare: { label: "Healthcare Professional", icon: Stethoscope },
-  regulator: { label: "Regulatory Officer", icon: Landmark },
-  admin: { label: "Admin", icon: Settings },
+  consumer: {
+    label: "Consumer",
+    icon: User,
+    access: "Personal medicine verification",
+  },
+  pharmacist: {
+    label: "Pharmacist",
+    icon: Pill,
+    access: "Dispensing and batch review",
+  },
+  healthcare: {
+    label: "Healthcare Professional",
+    icon: Stethoscope,
+    access: "Clinical verification workflow",
+  },
+  regulator: {
+    label: "Regulatory Officer",
+    icon: Landmark,
+    access: "Market surveillance reports",
+  },
+  admin: {
+    label: "Admin",
+    icon: Settings,
+    access: "Enterprise system controls",
+  },
 };
 
 type UserRole = keyof typeof ROLE_META;
@@ -65,6 +90,7 @@ type User = {
   password?: string;
   role: UserRole;
 };
+type SessionUser = Omit<User, "password">;
 type HistoryItem = {
   id: string;
   medicine: string;
@@ -89,6 +115,11 @@ type ReportItem = {
   id: string;
   title: string;
   date: string;
+};
+type ChatMessage = {
+  id: string;
+  sender: "assistant" | "user";
+  text: string;
 };
 
 const INITIAL_USERS: User[] = [
@@ -172,6 +203,48 @@ const REPORTS: ReportItem[] = [
   { id: "RP-303", title: "Batch incident overview", date: "2026-04-19" },
 ];
 
+const SESSION_KEY = "medauthPrototypeSession";
+
+function isScreenAllowed(screen: Screen, role: UserRole, isGuest: boolean) {
+  const alwaysAllowed: Screen[] = ["result", "offline"];
+  if (alwaysAllowed.includes(screen)) return true;
+  if (screen === "report") return !isGuest;
+  return getNavItems(role, isGuest).includes(screen);
+}
+
+function getStoredSession(): {
+  user: SessionUser;
+  isGuest: boolean;
+  screen: Screen;
+} | null {
+  try {
+    const rawSession = localStorage.getItem(SESSION_KEY);
+    if (!rawSession) return null;
+
+    const session = JSON.parse(rawSession);
+    const role = session?.user?.role as UserRole | undefined;
+    if (!role || !ROLE_META[role]) return null;
+
+    const screen = (session.screen || getDashboardScreen(role)) as Screen;
+    const isGuest = Boolean(session.isGuest);
+
+    return {
+      user: {
+        name: session.user.name || "MedAuth User",
+        email: session.user.email || "",
+        role,
+      },
+      isGuest,
+      screen: isScreenAllowed(screen, role, isGuest)
+        ? screen
+        : getDashboardScreen(role),
+    };
+  } catch {
+    localStorage.removeItem(SESSION_KEY);
+    return null;
+  }
+}
+
 const NAV_META = {
   home: { label: "Home", icon: Home },
   scan: { label: "Scan", icon: Camera },
@@ -235,12 +308,78 @@ function getScreenTitle(screen: Screen, roleLabel: string) {
   return "Settings";
 }
 
+const AI_PROMPTS = [
+  "Explain this verification result",
+  "Why is this product suspicious?",
+  "What should I do in offline mode?",
+  "Generate a regulatory summary",
+  "Explain blockchain validation",
+  "Summarise audit trail",
+];
+
+function getRoleAiLens(role: UserRole) {
+  if (role === "pharmacist") {
+    return "Pharmacist focus: verify the batch, retain packaging, check dispensing eligibility, and escalate any mismatch before release.";
+  }
+  if (role === "healthcare") {
+    return "Healthcare Professional focus: treat authenticity as part of clinical safety context and avoid patient use when verification is uncertain.";
+  }
+  if (role === "regulator") {
+    return "Regulatory Officer focus: review alert priority, affected batch evidence, market surveillance impact, and reporting completeness.";
+  }
+  if (role === "admin") {
+    return "Admin focus: inspect system logs, offline sync queues, access activity, and audit evidence for compliance support.";
+  }
+  return "Consumer focus: keep the medicine sealed, do not use it if warnings appear, and ask a pharmacist or healthcare professional for help.";
+}
+
+function getAiResponse(
+  prompt: string,
+  role: UserRole,
+  result: VerificationResult,
+  screen: Screen,
+  online: boolean,
+  history: HistoryItem[]
+) {
+  const roleLens = getRoleAiLens(role);
+  const statusConfig = getStatusConfig(result.status);
+  const latestHistory = history[0];
+
+  if (prompt.includes("suspicious")) {
+    return `${roleLens} This product may be suspicious when batch, manufacturer, barcode, expiry, or blockchain records do not fully align. Current signal: ${result.status} with ${result.confidence} confidence for batch ${result.batch}. Recommended action: isolate the product, preserve evidence, avoid dispensing or use, and submit a report if the concern remains.`;
+  }
+
+  if (prompt.includes("offline")) {
+    return `${roleLens} Offline mode uses cached verification data only. It can help with preliminary checks, but it cannot confirm the newest manufacturer updates, blockchain events, or regulatory alerts until sync completes. Current connectivity is ${online ? "online, so live validation should be available" : "offline, so treat results as limited"}.`;
+  }
+
+  if (prompt.includes("regulatory")) {
+    return `${roleLens} Regulatory summary: ${result.medicine}, batch ${result.batch}, manufacturer ${result.manufacturer}, status ${result.status}, confidence ${result.confidence}. Suggested filing note: ${statusConfig.note} Include barcode evidence, location, timestamps, user role, and any offline sync status before escalation.`;
+  }
+
+  if (prompt.includes("blockchain")) {
+    return `${roleLens} Blockchain validation compares the scanned batch against tamper-resistant product events such as manufacturer registration, distribution handoff, and verification history. For this prototype, ${result.batch} is simulated as ${result.status === "Authentic" ? "matching the trusted chain of custody" : "requiring review because one or more chain records may be incomplete or inconsistent"}.`;
+  }
+
+  if (prompt.includes("audit")) {
+    return `${roleLens} Audit trail summary: latest event ${latestHistory?.id || "N/A"} recorded ${latestHistory?.medicine || result.medicine} as ${latestHistory?.status || result.status}. Compliance monitoring should capture user role, verification status, timestamp, scan source, report submission, and pending offline synchronization records.`;
+  }
+
+  return `${roleLens} Verification explanation: ${result.medicine} batch ${result.batch} is currently marked ${result.status} with ${result.confidence} confidence. ${statusConfig.note} Next recommended action: ${
+    result.status === "Authentic"
+      ? "continue normal handling while checking expiry and packaging."
+      : result.status === "Suspicious"
+      ? "pause use or dispensing, inspect packaging, and escalate for review."
+      : "do not use or dispense; quarantine the item and submit an incident report."
+  }`;
+}
+
 export default function App() {
   const [users, setUsers] = useState<User[]>(INITIAL_USERS);
   const [authMode, setAuthMode] = useState("welcome");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isGuest, setIsGuest] = useState(false);
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [currentUser, setCurrentUser] = useState<SessionUser | null>(null);
   const [screen, setScreen] = useState<Screen>("home");
   const [online, setOnline] = useState(true);
 
@@ -248,6 +387,7 @@ export default function App() {
   const [loginPassword, setLoginPassword] = useState("");
   const [loginRole, setLoginRole] = useState<UserRole | "">("");
   const [loginError, setLoginError] = useState("");
+  const [loginLoading, setLoginLoading] = useState(false);
 
   const [signupName, setSignupName] = useState("");
   const [signupEmail, setSignupEmail] = useState("");
@@ -266,6 +406,15 @@ export default function App() {
   const [reportText, setReportText] = useState("");
   const [reportSubmitted, setReportSubmitted] = useState(false);
   const [history, setHistory] = useState<HistoryItem[]>(INITIAL_HISTORY);
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiTyping, setAiTyping] = useState(false);
+  const [aiMessages, setAiMessages] = useState<ChatMessage[]>([
+    {
+      id: "ai-welcome",
+      sender: "assistant",
+      text: "Prototype AI assistance is ready. I can explain verification status, warnings, offline limits, blockchain validation, reporting meaning, and next actions based on this MedAuth workspace.",
+    },
+  ]);
 
   const [verificationResult, setVerificationResult] = useState<VerificationResult>({
     medicine: "Paracetamol 500mg",
@@ -283,6 +432,40 @@ export default function App() {
   );
   const navItems = getNavItems(currentRole, isGuest);
 
+  useEffect(() => {
+    const storedSession = getStoredSession();
+    if (!storedSession) {
+      const selectedRole = localStorage.getItem("medauthSelectedRole");
+      if (selectedRole && ROLE_META[selectedRole as UserRole]) {
+        setLoginRole(selectedRole as UserRole);
+      }
+      return;
+    }
+
+    setCurrentUser(storedSession.user);
+    setIsGuest(storedSession.isGuest);
+    setIsLoggedIn(true);
+    setScreen(storedSession.screen);
+  }, []);
+
+  useEffect(() => {
+    if (!isLoggedIn || !currentUser) return;
+
+    if (!isScreenAllowed(screen, currentUser.role, isGuest)) {
+      setScreen(getDashboardScreen(currentUser.role));
+      return;
+    }
+
+    localStorage.setItem(
+      SESSION_KEY,
+      JSON.stringify({
+        user: currentUser,
+        isGuest,
+        screen,
+      })
+    );
+  }, [currentUser, isGuest, isLoggedIn, screen]);
+
   const resetAuthMessages = () => {
     setLoginError("");
     setSignupError("");
@@ -292,8 +475,12 @@ export default function App() {
   };
 
   const handleLogin = () => {
+    if (loginLoading) return;
+
     const email = loginEmail.trim().toLowerCase();
     const password = loginPassword.trim();
+
+    setLoginError("");
 
     if (!email) {
       setLoginError("Email is required.");
@@ -322,27 +509,54 @@ export default function App() {
       return;
     }
 
-    setCurrentUser(matchedUser);
-    setIsGuest(false);
-    setIsLoggedIn(true);
-    setScreen(getDashboardScreen(loginRole));
-    setAuthMode("welcome");
-    setLoginError("");
-    localStorage.setItem("medauthSelectedRole", loginRole);
-    localStorage.setItem("medauthDashboard", getDashboardScreen(loginRole));
+    const sessionUser: SessionUser = {
+      name: matchedUser.name,
+      email: matchedUser.email,
+      role: matchedUser.role,
+    };
+    const dashboardScreen = getDashboardScreen(loginRole);
+
+    setLoginLoading(true);
+    window.setTimeout(() => {
+      setCurrentUser(sessionUser);
+      setIsGuest(false);
+      setIsLoggedIn(true);
+      setScreen(dashboardScreen);
+      setAuthMode("welcome");
+      setLoginError("");
+      setLoginLoading(false);
+      localStorage.setItem("medauthSelectedRole", loginRole);
+      localStorage.setItem(
+        SESSION_KEY,
+        JSON.stringify({
+          user: sessionUser,
+          isGuest: false,
+          screen: dashboardScreen,
+        })
+      );
+    }, 750);
   };
 
   const handleGuest = () => {
-    setCurrentUser({
+    const guestUser: SessionUser = {
       name: "Guest User",
       email: "",
       role: "consumer",
-    });
+    };
+    setCurrentUser(guestUser);
     setIsGuest(true);
     setIsLoggedIn(true);
     setScreen("home");
     setAuthMode("welcome");
     setLoginError("");
+    localStorage.setItem(
+      SESSION_KEY,
+      JSON.stringify({
+        user: guestUser,
+        isGuest: true,
+        screen: "home",
+      })
+    );
   };
 
   const handleSignup = () => {
@@ -419,11 +633,13 @@ export default function App() {
     setIsGuest(false);
     setCurrentUser(null);
     setScreen("home");
+    setAiOpen(false);
     setAuthMode("welcome");
     setLoginPassword("");
     setLoginRole("");
     localStorage.removeItem("medauthSelectedRole");
     localStorage.removeItem("medauthDashboard");
+    localStorage.removeItem(SESSION_KEY);
     resetAuthMessages();
   };
 
@@ -432,7 +648,9 @@ export default function App() {
     setIsGuest(false);
     setCurrentUser(null);
     setScreen("home");
+    setAiOpen(false);
     setAuthMode("welcome");
+    localStorage.removeItem(SESSION_KEY);
     resetAuthMessages();
   };
 
@@ -498,6 +716,36 @@ export default function App() {
     }, 1200);
   };
 
+  const handleAiPrompt = (prompt: string) => {
+    if (aiTyping) return;
+
+    const userMessage: ChatMessage = {
+      id: `user-${Date.now()}`,
+      sender: "user",
+      text: prompt,
+    };
+
+    setAiMessages((prev) => [...prev, userMessage]);
+    setAiTyping(true);
+
+    window.setTimeout(() => {
+      const assistantMessage: ChatMessage = {
+        id: `assistant-${Date.now()}`,
+        sender: "assistant",
+        text: getAiResponse(
+          prompt.toLowerCase(),
+          currentRole,
+          verificationResult,
+          screen,
+          online,
+          history
+        ),
+      };
+      setAiMessages((prev) => [...prev, assistantMessage]);
+      setAiTyping(false);
+    }, 850);
+  };
+
   if (!isLoggedIn) {
     return (
       <div style={styles.appShell}>
@@ -513,6 +761,7 @@ export default function App() {
             showPassword={showPassword}
             setShowPassword={setShowPassword}
             error={loginError}
+            isLoading={loginLoading}
             onLogin={handleLogin}
             onGuest={handleGuest}
           />
@@ -612,6 +861,19 @@ export default function App() {
 
           <BottomNav navItems={navItems} active={screen} onChange={setScreen} />
         </div>
+        <AiAssistant
+          open={aiOpen}
+          onOpen={() => setAiOpen(true)}
+          onClose={() => setAiOpen(false)}
+          messages={aiMessages}
+          typing={aiTyping}
+          prompts={AI_PROMPTS}
+          onPrompt={handleAiPrompt}
+          roleLabel={roleMeta.label}
+          screen={screen}
+          online={online}
+          result={verificationResult}
+        />
       </PhoneFrame>
     </div>
   );
@@ -627,6 +889,7 @@ function AppLoginScreen({
   showPassword,
   setShowPassword,
   error,
+  isLoading,
   onLogin,
   onGuest,
 }: any) {
@@ -638,15 +901,23 @@ function AppLoginScreen({
   return (
     <div className="app-login-screen" style={styles.appLoginScreen}>
       <div className="app-login-top" style={styles.appLoginTop}>
+        <div style={styles.secureAccessBadge}>
+          <ShieldCheck size={14} color={COLORS.success} />
+          <span>Secure compliance access</span>
+        </div>
+
         <div style={styles.appLogoRow}>
           <div className="app-logo-mark" style={styles.appLogoMark}>
             <ShieldCheck size={28} color={COLORS.card} />
           </div>
           <div>
-            <div style={styles.appLoginKicker}>Identity Gateway</div>
+            <div style={styles.appLoginKicker}>
+              Enterprise medicine verification
+            </div>
             <h1 style={styles.appLoginTitle}>MedAuth</h1>
             <p style={styles.appLoginSubtitle}>
-              Enterprise medicine verification and compliance access
+              Role-based healthcare authentication for medicine verification,
+              compliance review, and trusted operational access.
             </p>
           </div>
         </div>
@@ -654,29 +925,31 @@ function AppLoginScreen({
         <div style={styles.enterpriseStatusRow}>
           <div className="enterprise-status-chip" style={styles.enterpriseStatusChip}>
             <ShieldCheck size={14} color={COLORS.success} />
-            <span>Verified access</span>
+            <span>HIPAA-ready prototype</span>
           </div>
           <div className="enterprise-status-chip" style={styles.enterpriseStatusChip}>
             <Lock size={14} color={COLORS.primary} />
-            <span>Secure session</span>
+            <span>Secure compliance access</span>
           </div>
         </div>
       </div>
 
-      <div className="app-login-card">
+      <div className="app-login-card-wrap">
         <Card style={styles.appLoginCard}>
           <div style={styles.loginCardHeader}>
             <div>
-              <div style={styles.cardTitle}>Sign in</div>
+              <div style={styles.cardTitle}>Secure sign in</div>
               <div style={styles.loginCardSubtitle}>
-                Access your assigned compliance workspace.
+                Choose your role to enter the correct MedAuth workspace.
               </div>
             </div>
-            <ShieldCheck size={22} color={COLORS.success} />
+            <div style={styles.loginHeaderIcon}>
+              <ShieldCheck size={20} color={COLORS.success} />
+            </div>
           </div>
 
           <div style={styles.inputWrap}>
-            <div style={styles.inputLabel}>Select role</div>
+            <div style={styles.inputLabel}>Role-based healthcare authentication</div>
             <div style={styles.roleOptionList}>
               {roleOptions.map(([key, meta], index) => {
                 const Icon = meta.icon;
@@ -694,11 +967,35 @@ function AppLoginScreen({
                     }}
                     aria-pressed={selected}
                   >
-                    <Icon
-                      size={17}
-                      color={selected ? COLORS.card : COLORS.primary}
-                    />
-                    <span>{meta.label}</span>
+                    <div
+                      style={{
+                        ...styles.roleIconBox,
+                        ...(selected ? styles.roleIconBoxActive : {}),
+                      }}
+                    >
+                      <Icon
+                        size={17}
+                        color={selected ? COLORS.card : COLORS.primary}
+                      />
+                    </div>
+                    <span style={styles.roleTextStack}>
+                      <span>{meta.label}</span>
+                      <span
+                        style={{
+                          ...styles.roleAccessText,
+                          color: selected ? "rgba(255,255,255,0.78)" : COLORS.subtext,
+                        }}
+                      >
+                        {meta.access}
+                      </span>
+                    </span>
+                    {selected ? (
+                      <CheckCircle2
+                        className="role-selected-check"
+                        size={17}
+                        color={COLORS.card}
+                      />
+                    ) : null}
                   </button>
                 );
               })}
@@ -725,9 +1022,11 @@ function AppLoginScreen({
 
           <div className="login-submit-motion">
             <PrimaryButton
-              label="Continue to Dashboard"
+              label={isLoading ? "Verifying Access" : "Continue to Dashboard"}
               onClick={onLogin}
               icon={Lock}
+              loading={isLoading}
+              disabled={isLoading}
             />
           </div>
 
@@ -736,6 +1035,7 @@ function AppLoginScreen({
             className="guest-access-button"
             style={styles.guestAccessButton}
             onClick={onGuest}
+            disabled={isLoading}
           >
             <User size={16} color={COLORS.primary} />
             <span>Continue with Guest Access</span>
@@ -748,7 +1048,7 @@ function AppLoginScreen({
 
 function PhoneFrame({ children }: any) {
   return (
-    <div style={styles.phoneOuter}>
+    <div className="phone-frame" style={styles.phoneOuter}>
       <div style={styles.phoneNotch} />
       <div style={styles.phoneInner}>{children}</div>
     </div>
@@ -1324,8 +1624,153 @@ function SettingsScreen({ roleLabel, name, email, isGuest, onLogout }: any) {
         <SettingRow icon={ShieldCheck} label="Verification Preferences" />
       </Card>
 
-      {!isGuest && (
-        <SecondaryButton label="Log Out" onClick={onLogout} icon={LogOut} />
+      <SecondaryButton
+        label={isGuest ? "Exit Guest Session" : "Log Out"}
+        onClick={onLogout}
+        icon={LogOut}
+      />
+    </div>
+  );
+}
+
+function AiAssistant({
+  open,
+  onOpen,
+  onClose,
+  messages,
+  typing,
+  prompts,
+  onPrompt,
+  roleLabel,
+  screen,
+  online,
+  result,
+}: any) {
+  const statusCfg = getStatusConfig(result.status);
+
+  return (
+    <div style={styles.aiLayer}>
+      {open && (
+        <div className="ai-panel-motion" style={styles.aiPanel}>
+          <div style={styles.aiPanelGlow} />
+          <div style={styles.aiHeader}>
+            <div style={styles.aiTitleRow}>
+              <div className="ai-orb-motion" style={styles.aiIconWrap}>
+                <Bot size={20} color={COLORS.card} />
+              </div>
+              <div>
+                <div style={styles.aiTitle}>MedAuth AI Assistant</div>
+                <div style={styles.aiSubtitle}>Prototype AI assistance</div>
+              </div>
+            </div>
+            <button
+              type="button"
+              aria-label="Close AI Assistant"
+              onClick={onClose}
+              style={styles.aiCloseButton}
+            >
+              <X size={16} color={COLORS.text} />
+            </button>
+          </div>
+
+          <div style={styles.aiContextGrid}>
+            <div style={styles.aiContextChip}>
+              <User size={13} color={COLORS.primary} />
+              <span>{roleLabel}</span>
+            </div>
+            <div style={styles.aiContextChip}>
+              {online ? (
+                <Wifi size={13} color={COLORS.success} />
+              ) : (
+                <WifiOff size={13} color={COLORS.warning} />
+              )}
+              <span>{online ? "Live sync" : "Offline cache"}</span>
+            </div>
+            <div style={styles.aiContextChip}>
+              <ClipboardCheck size={13} color={statusCfg.color} />
+              <span>{result.status}</span>
+            </div>
+            <div style={styles.aiContextChip}>
+              <Sparkles size={13} color={COLORS.success} />
+              <span>{screen}</span>
+            </div>
+          </div>
+
+          <div style={styles.aiMessages}>
+            {messages.map((message: ChatMessage) => (
+              <div
+                key={message.id}
+                className="ai-message-motion"
+                style={{
+                  ...styles.aiMessageRow,
+                  justifyContent:
+                    message.sender === "user" ? "flex-end" : "flex-start",
+                }}
+              >
+                <div
+                  style={{
+                    ...styles.aiMessageBubble,
+                    ...(message.sender === "user"
+                      ? styles.aiUserBubble
+                      : styles.aiAssistantBubble),
+                  }}
+                >
+                  {message.text}
+                </div>
+              </div>
+            ))}
+            {typing && (
+              <div className="ai-message-motion" style={styles.aiMessageRow}>
+                <div style={{ ...styles.aiMessageBubble, ...styles.aiAssistantBubble }}>
+                  <div style={styles.typingRow}>
+                    <span className="typing-dot" />
+                    <span className="typing-dot" />
+                    <span className="typing-dot" />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div style={styles.aiPromptGrid}>
+            {prompts.map((prompt: string) => (
+              <button
+                key={prompt}
+                type="button"
+                className="ai-prompt-button"
+                onClick={() => onPrompt(prompt)}
+                disabled={typing}
+                style={styles.aiPromptButton}
+              >
+                {prompt}
+              </button>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            className="ai-send-button"
+            onClick={() => onPrompt("Explain this verification result")}
+            disabled={typing}
+            style={styles.aiSendButton}
+          >
+            <Send size={15} color={COLORS.card} />
+            <span>Ask for next action</span>
+          </button>
+        </div>
+      )}
+
+      {!open && (
+        <button
+          type="button"
+          className="ai-floating-button"
+          onClick={onOpen}
+          style={styles.aiFloatingButton}
+          aria-label="Open MedAuth AI Assistant"
+        >
+          <Bot size={22} color={COLORS.card} />
+          <span style={styles.aiFloatingText}>AI</span>
+        </button>
       )}
     </div>
   );
@@ -1387,14 +1832,25 @@ function IconButton({ icon: Icon, onClick }: any) {
   );
 }
 
-function PrimaryButton({ label, onClick, disabled = false, icon: Icon }: any) {
+function PrimaryButton({
+  label,
+  onClick,
+  disabled = false,
+  icon: Icon,
+  loading = false,
+}: any) {
   return (
     <button
+      className="primary-button-motion"
       onClick={onClick}
       disabled={disabled}
       style={{ ...styles.primaryBtn, opacity: disabled ? 0.7 : 1 }}
     >
-      {Icon ? <Icon size={16} color={COLORS.card} /> : null}
+      {loading ? (
+        <span className="login-spinner" aria-hidden="true" />
+      ) : Icon ? (
+        <Icon size={16} color={COLORS.card} />
+      ) : null}
       <span>{label}</span>
     </button>
   );
@@ -1402,7 +1858,7 @@ function PrimaryButton({ label, onClick, disabled = false, icon: Icon }: any) {
 
 function SecondaryButton({ label, onClick, icon: Icon }: any) {
   return (
-    <button onClick={onClick} style={styles.secondaryBtn}>
+    <button className="secondary-button-motion" onClick={onClick} style={styles.secondaryBtn}>
       {Icon ? <Icon size={16} color={COLORS.primary} /> : null}
       <span>{label}</span>
     </button>
@@ -1428,7 +1884,7 @@ function Input({
   return (
     <div style={styles.inputWrap}>
       <div style={styles.inputLabel}>{label}</div>
-      <div style={styles.inputBox}>
+      <div className="input-box-motion" style={styles.inputBox}>
         {Icon ? <Icon size={16} color={COLORS.subtext} /> : null}
         <input
           value={value}
@@ -1453,7 +1909,7 @@ function PasswordInput({
   return (
     <div style={styles.inputWrap}>
       <div style={styles.inputLabel}>{label}</div>
-      <div style={styles.inputBox}>
+      <div className="input-box-motion" style={styles.inputBox}>
         <Lock size={16} color={COLORS.subtext} />
         <input
           type={showPassword ? "text" : "password"}
@@ -1517,7 +1973,8 @@ function SettingRow({ icon: Icon, label }: any) {
 const styles: Record<string, CSSProperties> = {
   appShell: {
     minHeight: "100vh",
-    background: `linear-gradient(180deg, ${COLORS.bg} 0%, #EAF1FB 100%)`,
+    background:
+      "linear-gradient(135deg, #E9F7F8 0%, #EEF5FF 48%, #F7FAFC 100%)",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -1597,17 +2054,32 @@ const styles: Record<string, CSSProperties> = {
   appLoginScreen: {
     height: "calc(100% - 40px)",
     overflowY: "auto",
-    padding: "28px 18px 18px 18px",
+    padding: "24px 18px 18px 18px",
     display: "flex",
     flexDirection: "column",
     gap: 18,
-    background:
-      "linear-gradient(180deg, #F8FBFD 0%, #F3F7FA 48%, #EEF4F8 100%)",
+    background: "linear-gradient(160deg, #F7FCFF 0%, #EFF9F6 48%, #ECF4FF 100%)",
   },
   appLoginTop: {
     display: "flex",
     flexDirection: "column",
-    gap: 16,
+    gap: 14,
+  },
+  secureAccessBadge: {
+    alignSelf: "flex-start",
+    minHeight: 32,
+    borderRadius: 999,
+    border: "1px solid rgba(39, 174, 96, 0.2)",
+    background: "rgba(255, 255, 255, 0.72)",
+    backdropFilter: "blur(16px)",
+    color: COLORS.text,
+    display: "flex",
+    alignItems: "center",
+    gap: 7,
+    padding: "0 11px",
+    fontSize: 11,
+    fontWeight: 900,
+    boxShadow: "0 10px 20px rgba(15, 23, 42, 0.05)",
   },
   appLogoRow: {
     display: "flex",
@@ -1634,7 +2106,7 @@ const styles: Record<string, CSSProperties> = {
   },
   appLoginTitle: {
     margin: 0,
-    fontSize: 30,
+    fontSize: 32,
     lineHeight: 1,
     fontWeight: 900,
     color: COLORS.text,
@@ -1654,7 +2126,8 @@ const styles: Record<string, CSSProperties> = {
     minHeight: 40,
     borderRadius: 14,
     border: "1px solid rgba(47, 128, 237, 0.12)",
-    background: "rgba(255,255,255,0.84)",
+    background: "rgba(255,255,255,0.7)",
+    backdropFilter: "blur(16px)",
     color: COLORS.text,
     display: "flex",
     alignItems: "center",
@@ -1666,8 +2139,10 @@ const styles: Record<string, CSSProperties> = {
   },
   appLoginCard: {
     borderRadius: 20,
-    border: "1px solid rgba(214, 224, 230, 0.92)",
-    boxShadow: "0 18px 42px rgba(15, 23, 42, 0.1)",
+    border: "1px solid rgba(214, 224, 230, 0.72)",
+    background: "rgba(255, 255, 255, 0.78)",
+    backdropFilter: "blur(20px)",
+    boxShadow: "0 22px 46px rgba(15, 23, 42, 0.12)",
   },
   loginCardHeader: {
     display: "flex",
@@ -1683,13 +2158,23 @@ const styles: Record<string, CSSProperties> = {
     marginTop: -6,
     lineHeight: 1.4,
   },
+  loginHeaderIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    background: "#EAF8F0",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
   roleOptionList: {
     display: "grid",
     gridTemplateColumns: "1fr",
     gap: 8,
   },
   roleOptionButton: {
-    minHeight: 46,
+    minHeight: 58,
     borderRadius: 14,
     border: `1px solid ${COLORS.border}`,
     background: "#FBFCFD",
@@ -1702,14 +2187,40 @@ const styles: Record<string, CSSProperties> = {
     fontSize: 13,
     cursor: "pointer",
     textAlign: "left",
+    position: "relative",
     transition:
       "transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease, background 160ms ease",
   },
   roleOptionButtonActive: {
-    background: COLORS.primary,
+    background: `linear-gradient(135deg, ${COLORS.primary}, ${COLORS.success})`,
     borderColor: COLORS.primary,
     color: COLORS.card,
-    boxShadow: "0 10px 18px rgba(47, 128, 237, 0.22)",
+    boxShadow: "0 14px 24px rgba(47, 128, 237, 0.25)",
+  },
+  roleIconBox: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    background: "#EEF5FF",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  roleIconBoxActive: {
+    background: "rgba(255,255,255,0.18)",
+  },
+  roleTextStack: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 2,
+    flex: 1,
+    minWidth: 0,
+  },
+  roleAccessText: {
+    fontSize: 11,
+    lineHeight: 1.25,
+    fontWeight: 700,
   },
   guestAccessButton: {
     width: "100%",
