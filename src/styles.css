@@ -174,6 +174,91 @@ textarea {
   transform: translateY(0) scale(0.99);
 }
 
+.ai-floating-button {
+  animation:
+    aiFloat 3.4s ease-in-out infinite,
+    aiPulseRing 2.4s ease-in-out infinite;
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    filter 180ms ease;
+}
+
+.ai-floating-button:hover {
+  transform: translateY(-2px) scale(1.03);
+  filter: saturate(1.08);
+}
+
+.ai-floating-button:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.ai-panel-motion {
+  animation: aiPanelIn 360ms cubic-bezier(0.2, 0.82, 0.2, 1) both;
+}
+
+.ai-orb-motion {
+  animation: aiOrbGlow 2.8s ease-in-out infinite;
+}
+
+.ai-message-motion {
+  animation: aiMessageIn 260ms ease both;
+}
+
+.ai-prompt-button {
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    background 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.ai-prompt-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: rgba(39, 174, 96, 0.35) !important;
+  background: rgba(239, 249, 246, 0.95) !important;
+  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.07);
+}
+
+.ai-prompt-button:active:not(:disabled) {
+  transform: translateY(0) scale(0.99);
+}
+
+.ai-prompt-button:disabled,
+.ai-send-button:disabled {
+  cursor: wait !important;
+  opacity: 0.68;
+}
+
+.ai-send-button {
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    filter 160ms ease;
+}
+
+.ai-send-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: saturate(1.06);
+  box-shadow: 0 18px 30px rgba(47, 128, 237, 0.3) !important;
+}
+
+.typing-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: #2f80ed;
+  animation: typingBounce 900ms ease-in-out infinite;
+}
+
+.typing-dot:nth-child(2) {
+  animation-delay: 140ms;
+}
+
+.typing-dot:nth-child(3) {
+  animation-delay: 280ms;
+}
+
 @keyframes appScreenIn {
   from {
     opacity: 0;
@@ -261,6 +346,75 @@ textarea {
   }
   50% {
     box-shadow: 0 16px 32px rgba(39, 174, 96, 0.28);
+  }
+}
+
+@keyframes aiFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+@keyframes aiPulseRing {
+  0%,
+  100% {
+    box-shadow:
+      0 18px 34px rgba(47, 128, 237, 0.32),
+      0 0 0 7px rgba(47, 128, 237, 0.08);
+  }
+  50% {
+    box-shadow:
+      0 20px 38px rgba(39, 174, 96, 0.28),
+      0 0 0 11px rgba(39, 174, 96, 0.1);
+  }
+}
+
+@keyframes aiPanelIn {
+  from {
+    opacity: 0;
+    transform: translateX(28px) translateY(16px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) translateY(0) scale(1);
+  }
+}
+
+@keyframes aiMessageIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes aiOrbGlow {
+  0%,
+  100% {
+    box-shadow: 0 12px 24px rgba(47, 128, 237, 0.26);
+  }
+  50% {
+    box-shadow: 0 14px 28px rgba(39, 174, 96, 0.3);
+  }
+}
+
+@keyframes typingBounce {
+  0%,
+  70%,
+  100% {
+    opacity: 0.4;
+    transform: translateY(0);
+  }
+  35% {
+    opacity: 1;
+    transform: translateY(-4px);
   }
 }
 
