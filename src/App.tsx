@@ -6,27 +6,34 @@ import {
   Camera,
   CheckCircle2,
   ClipboardCheck,
+  Database,
   Eye,
   EyeOff,
+  Fingerprint,
   FileText,
   Globe,
   History,
   Home,
   Landmark,
+  Languages,
   Lock,
   LogOut,
+  MapPin,
   Pill,
+  Save,
   Search,
   Send,
   Settings,
   ShieldAlert,
   ShieldCheck,
   ShieldX,
+  SlidersHorizontal,
   Sparkles,
   Stethoscope,
   TriangleAlert,
   Upload,
   User,
+  Volume2,
   Wifi,
   WifiOff,
   X,
@@ -83,6 +90,12 @@ type Screen =
   | "result"
   | "report"
   | "offline";
+type SettingsDetail =
+  | "privacy"
+  | "language"
+  | "verification"
+  | "guest"
+  | null;
 type VerificationStatus = "Authentic" | "Suspicious" | "Counterfeit";
 type User = {
   name: string;
@@ -292,9 +305,211 @@ function getNavItems(role: UserRole, isGuest: boolean): Screen[] {
 }
 
 function getDashboardScreen(role: UserRole): Screen {
-  if (role === "regulator" || role === "admin") return "reports";
   return "home";
 }
+
+type DashboardCard = {
+  title: string;
+  description: string;
+  metric: string;
+  badge: string;
+  tone: "primary" | "success" | "warning" | "danger" | "neutral";
+  icon: typeof Camera;
+  screen: Screen;
+};
+
+const DASHBOARD_CARDS: Record<UserRole, DashboardCard[]> = {
+  consumer: [
+    {
+      title: "Scan Medicine",
+      description: "Verify product authenticity from barcode or manual code.",
+      metric: "98%",
+      badge: "Ready",
+      tone: "primary",
+      icon: Camera,
+      screen: "scan",
+    },
+    {
+      title: "Recent Verification",
+      description: "Review your latest medication checks and outcomes.",
+      metric: "3",
+      badge: "Updated",
+      tone: "success",
+      icon: History,
+      screen: "history",
+    },
+    {
+      title: "Safety Guidance",
+      description: "See handling guidance for verified or suspicious products.",
+      metric: "24/7",
+      badge: "Guidance",
+      tone: "success",
+      icon: ShieldCheck,
+      screen: "result",
+    },
+    {
+      title: "Report Suspicious Product",
+      description: "Submit packaging, batch, or counterfeit concerns.",
+      metric: "1 min",
+      badge: "Escalate",
+      tone: "warning",
+      icon: ShieldAlert,
+      screen: "report",
+    },
+  ],
+  pharmacist: [
+    {
+      title: "Verify Before Dispensing",
+      description: "Confirm medicine status before patient handoff.",
+      metric: "Live",
+      badge: "Dispense",
+      tone: "primary",
+      icon: ClipboardCheck,
+      screen: "scan",
+    },
+    {
+      title: "Batch Lookup",
+      description: "Search batch records and recent verification history.",
+      metric: "3",
+      badge: "Indexed",
+      tone: "success",
+      icon: Search,
+      screen: "history",
+    },
+    {
+      title: "Suspicious Alerts",
+      description: "Monitor high-priority product warnings and recalls.",
+      metric: "1 high",
+      badge: "Review",
+      tone: "danger",
+      icon: Bell,
+      screen: "alerts",
+    },
+    {
+      title: "Offline Sync Status",
+      description: "Track cached verifications waiting for synchronization.",
+      metric: "12",
+      badge: "Pending",
+      tone: "warning",
+      icon: WifiOff,
+      screen: "offline",
+    },
+  ],
+  healthcare: [
+    {
+      title: "Medicine Safety Check",
+      description: "Validate authenticity before clinical recommendations.",
+      metric: "98%",
+      badge: "Clinical",
+      tone: "primary",
+      icon: Stethoscope,
+      screen: "scan",
+    },
+    {
+      title: "Verification History",
+      description: "Review prior medication status checks and audit notes.",
+      metric: "3",
+      badge: "Tracked",
+      tone: "success",
+      icon: History,
+      screen: "history",
+    },
+    {
+      title: "Patient Safety Notes",
+      description: "Reference handling advice for suspicious results.",
+      metric: "Active",
+      badge: "Care",
+      tone: "success",
+      icon: FileText,
+      screen: "result",
+    },
+    {
+      title: "Clinical Alert Review",
+      description: "Assess warnings that may affect patient medication use.",
+      metric: "3",
+      badge: "Alerts",
+      tone: "warning",
+      icon: TriangleAlert,
+      screen: "alerts",
+    },
+  ],
+  regulator: [
+    {
+      title: "Counterfeit Alerts",
+      description: "Prioritize suspected counterfeit signals by severity.",
+      metric: "1 high",
+      badge: "Critical",
+      tone: "danger",
+      icon: ShieldX,
+      screen: "alerts",
+    },
+    {
+      title: "Verification Analytics",
+      description: "Inspect verification volume and status distribution.",
+      metric: "1.2k",
+      badge: "Live",
+      tone: "primary",
+      icon: ClipboardCheck,
+      screen: "reports",
+    },
+    {
+      title: "Regional Monitoring",
+      description: "Monitor product risk patterns across operating regions.",
+      metric: "5",
+      badge: "Regions",
+      tone: "success",
+      icon: Globe,
+      screen: "alerts",
+    },
+    {
+      title: "Regulatory Report Generator",
+      description: "Prepare compliance summaries and incident reports.",
+      metric: "3",
+      badge: "Reports",
+      tone: "warning",
+      icon: FileText,
+      screen: "reports",
+    },
+  ],
+  admin: [
+    {
+      title: "User Management",
+      description: "Manage role access and enterprise account status.",
+      metric: "5",
+      badge: "Roles",
+      tone: "primary",
+      icon: User,
+      screen: "settings",
+    },
+    {
+      title: "Audit Logs",
+      description: "Review system access and verification event records.",
+      metric: "248",
+      badge: "Logged",
+      tone: "success",
+      icon: FileText,
+      screen: "reports",
+    },
+    {
+      title: "Sync Monitoring",
+      description: "Track offline queue health and synchronization events.",
+      metric: "12",
+      badge: "Queue",
+      tone: "warning",
+      icon: Wifi,
+      screen: "offline",
+    },
+    {
+      title: "System Health",
+      description: "Monitor uptime, authentication, and service readiness.",
+      metric: "99.9%",
+      badge: "Healthy",
+      tone: "success",
+      icon: ShieldCheck,
+      screen: "alerts",
+    },
+  ],
+};
 
 function getScreenTitle(screen: Screen, roleLabel: string) {
   if (screen === "home") return "Dashboard";
@@ -308,14 +523,24 @@ function getScreenTitle(screen: Screen, roleLabel: string) {
   return "Settings";
 }
 
+function getSettingsDetailTitle(detail: SettingsDetail) {
+  if (detail === "privacy") return "Privacy and Security";
+  if (detail === "language") return "Language Preferences";
+  if (detail === "verification") return "Verification Preferences";
+  if (detail === "guest") return "Guest Access";
+  return "Settings";
+}
+
 const AI_PROMPTS = [
   "Explain this verification result",
-  "Why is this product suspicious?",
-  "What should I do in offline mode?",
-  "Generate a regulatory summary",
+  "Explain counterfeit warning",
+  "Explain offline mode limitation",
   "Explain blockchain validation",
+  "Generate a regulatory summary",
   "Summarise audit trail",
 ];
+
+const AI_PROTOTYPE_LABEL = "Prototype AI Assistant – simulated responses only.";
 
 function getRoleAiLens(role: UserRole) {
   if (role === "pharmacist") {
@@ -341,31 +566,34 @@ function getAiResponse(
   online: boolean,
   history: HistoryItem[]
 ) {
+  // Prototype-only AI simulation: no API keys, network calls, or external AI
+  // services are used in the browser. A real AI integration would require a
+  // secure backend API layer to protect secrets and enforce authorization.
   const roleLens = getRoleAiLens(role);
   const statusConfig = getStatusConfig(result.status);
   const latestHistory = history[0];
 
-  if (prompt.includes("suspicious")) {
-    return `${roleLens} This product may be suspicious when batch, manufacturer, barcode, expiry, or blockchain records do not fully align. Current signal: ${result.status} with ${result.confidence} confidence for batch ${result.batch}. Recommended action: isolate the product, preserve evidence, avoid dispensing or use, and submit a report if the concern remains.`;
+  if (prompt.includes("counterfeit") || prompt.includes("suspicious")) {
+    return `${roleLens} Counterfeit warning explanation: the simulated warning is triggered when batch, manufacturer, barcode, expiry, packaging, or blockchain records do not fully align. Current mock signal: ${result.status} with ${result.confidence} confidence for batch ${result.batch}. Recommended prototype action: isolate the product, preserve evidence, avoid dispensing or use, and submit a report if the concern remains.`;
   }
 
   if (prompt.includes("offline")) {
-    return `${roleLens} Offline mode uses cached verification data only. It can help with preliminary checks, but it cannot confirm the newest manufacturer updates, blockchain events, or regulatory alerts until sync completes. Current connectivity is ${online ? "online, so live validation should be available" : "offline, so treat results as limited"}.`;
+    return `${roleLens} Offline mode limitation: this prototype uses mock cached verification data only. It can show a preliminary status, but it cannot confirm newest manufacturer updates, blockchain events, or regulatory alerts until a real secure sync layer exists. Current connectivity is ${online ? "online in the UI simulation" : "offline in the UI simulation, so treat results as limited"}.`;
   }
 
   if (prompt.includes("regulatory")) {
-    return `${roleLens} Regulatory summary: ${result.medicine}, batch ${result.batch}, manufacturer ${result.manufacturer}, status ${result.status}, confidence ${result.confidence}. Suggested filing note: ${statusConfig.note} Include barcode evidence, location, timestamps, user role, and any offline sync status before escalation.`;
+    return `${roleLens} Regulatory summary: ${result.medicine}, batch ${result.batch}, manufacturer ${result.manufacturer}, status ${result.status}, confidence ${result.confidence}. Mock filing note: ${statusConfig.note} Include barcode evidence, location, timestamps, user role, and any offline sync status before escalation.`;
   }
 
   if (prompt.includes("blockchain")) {
-    return `${roleLens} Blockchain validation compares the scanned batch against tamper-resistant product events such as manufacturer registration, distribution handoff, and verification history. For this prototype, ${result.batch} is simulated as ${result.status === "Authentic" ? "matching the trusted chain of custody" : "requiring review because one or more chain records may be incomplete or inconsistent"}.`;
+    return `${roleLens} Blockchain validation status: this prototype simulates comparing the scanned batch against tamper-resistant product events such as manufacturer registration, distribution handoff, and verification history. Batch ${result.batch} is shown as ${result.status === "Authentic" ? "matching the mock chain of custody" : "requiring review because one or more mock chain records may be incomplete or inconsistent"}.`;
   }
 
   if (prompt.includes("audit")) {
-    return `${roleLens} Audit trail summary: latest event ${latestHistory?.id || "N/A"} recorded ${latestHistory?.medicine || result.medicine} as ${latestHistory?.status || result.status}. Compliance monitoring should capture user role, verification status, timestamp, scan source, report submission, and pending offline synchronization records.`;
+    return `${roleLens} Audit trail summary: latest mock event ${latestHistory?.id || "N/A"} recorded ${latestHistory?.medicine || result.medicine} as ${latestHistory?.status || result.status}. Compliance monitoring should capture user role, verification status, timestamp, scan source, report submission, and pending offline synchronization records.`;
   }
 
-  return `${roleLens} Verification explanation: ${result.medicine} batch ${result.batch} is currently marked ${result.status} with ${result.confidence} confidence. ${statusConfig.note} Next recommended action: ${
+  return `${roleLens} Verification result explanation: ${result.medicine} batch ${result.batch} is currently marked ${result.status} with ${result.confidence} confidence using local mock data. ${statusConfig.note} Next recommended prototype action: ${
     result.status === "Authentic"
       ? "continue normal handling while checking expiry and packaging."
       : result.status === "Suspicious"
@@ -381,6 +609,7 @@ export default function App() {
   const [isGuest, setIsGuest] = useState(false);
   const [currentUser, setCurrentUser] = useState<SessionUser | null>(null);
   const [screen, setScreen] = useState<Screen>("home");
+  const [settingsDetail, setSettingsDetail] = useState<SettingsDetail>(null);
   const [online, setOnline] = useState(true);
 
   const [loginEmail, setLoginEmail] = useState("");
@@ -412,7 +641,7 @@ export default function App() {
     {
       id: "ai-welcome",
       sender: "assistant",
-      text: "Prototype AI assistance is ready. I can explain verification status, warnings, offline limits, blockchain validation, reporting meaning, and next actions based on this MedAuth workspace.",
+      text: "Prototype AI assistance is ready. Responses are generated locally from predefined MedAuth scenarios, with no external AI service or API key.",
     },
   ]);
 
@@ -465,6 +694,10 @@ export default function App() {
       })
     );
   }, [currentUser, isGuest, isLoggedIn, screen]);
+
+  useEffect(() => {
+    if (screen !== "settings") setSettingsDetail(null);
+  }, [screen]);
 
   const resetAuthMessages = () => {
     setLoginError("");
@@ -654,6 +887,18 @@ export default function App() {
     resetAuthMessages();
   };
 
+  const handleGuestAuth = (mode: "welcome" | "signup") => {
+    setIsLoggedIn(false);
+    setIsGuest(false);
+    setCurrentUser(null);
+    setScreen("home");
+    setSettingsDetail(null);
+    setAiOpen(false);
+    setAuthMode(mode);
+    localStorage.removeItem(SESSION_KEY);
+    resetAuthMessages();
+  };
+
   const handleVerify = () => {
     const input = scanInput.trim().toLowerCase();
 
@@ -719,6 +964,8 @@ export default function App() {
   const handleAiPrompt = (prompt: string) => {
     if (aiTyping) return;
 
+    // Keep assistant behavior client-safe: selected prompts are answered by
+    // local mock logic only. Real AI must be proxied through a secure backend.
     const userMessage: ChatMessage = {
       id: `user-${Date.now()}`,
       sender: "user",
@@ -776,8 +1023,18 @@ export default function App() {
         <StatusBar online={online} />
         <div style={styles.screenWrap}>
           <TopBar
-            title={getScreenTitle(screen, roleMeta.label)}
-            onBack={screen !== "home" ? () => setScreen("home") : undefined}
+            title={
+              screen === "settings" && settingsDetail
+                ? getSettingsDetailTitle(settingsDetail)
+                : getScreenTitle(screen, roleMeta.label)
+            }
+            onBack={
+              screen === "settings" && settingsDetail
+                ? () => setSettingsDetail(null)
+                : screen !== "home"
+                ? () => setScreen("home")
+                : undefined
+            }
           />
 
           <div style={styles.contentArea}>
@@ -854,7 +1111,12 @@ export default function App() {
                 name={currentUser?.name || "User"}
                 email={currentUser?.email || ""}
                 isGuest={isGuest}
+                detail={settingsDetail}
+                onOpenDetail={setSettingsDetail}
+                onBack={() => setSettingsDetail(null)}
                 onLogout={handleLogout}
+                onSignIn={() => handleGuestAuth("welcome")}
+                onCreateAccount={() => handleGuestAuth("signup")}
               />
             )}
           </div>
@@ -916,10 +1178,17 @@ function AppLoginScreen({
             </div>
             <h1 style={styles.appLoginTitle}>MedAuth</h1>
             <p style={styles.appLoginSubtitle}>
-              Role-based healthcare authentication for medicine verification,
-              compliance review, and trusted operational access.
+              Premium healthcare SaaS authentication for verified medicine
+              workflows, compliance review, and trusted operational access.
             </p>
           </div>
+        </div>
+
+        <div style={styles.loginSecurityMessage}>
+          <Lock size={14} color={COLORS.primary} />
+          <span>
+            Secure role-based access for medication verification and compliance monitoring.
+          </span>
         </div>
 
         <div style={styles.enterpriseStatusRow}>
@@ -1286,31 +1555,55 @@ function HomeScreen({
   onGuestBack,
 }: any) {
   const RoleIcon = roleMeta.icon;
-
-  const features = [
-    "Secure login and role-based access",
-    "Barcode scanning and manual code entry",
-    "Authentic, suspicious, or counterfeit results",
-    "Offline verification and data synchronization",
-    currentRole === "admin"
-      ? "Administrator account management"
-      : "Incident reporting and compliance dashboards",
+  const dashboardCards = DASHBOARD_CARDS[currentRole as UserRole] || DASHBOARD_CARDS.consumer;
+  const dashboardKpis = [
+    {
+      label: "Verified",
+      value: currentRole === "consumer" ? "3" : "1.2k",
+      trend: "+12%",
+      tone: "success" as const,
+    },
+    {
+      label: "Alerts",
+      value: currentRole === "consumer" ? "0" : "3",
+      trend: currentRole === "regulator" ? "1 high" : "stable",
+      tone: currentRole === "regulator" ? ("danger" as const) : ("primary" as const),
+    },
+    {
+      label: "Sync",
+      value: online ? "Live" : "Cache",
+      trend: online ? "online" : "offline",
+      tone: online ? ("success" as const) : ("warning" as const),
+    },
   ];
 
   return (
     <div style={styles.stackGapLg}>
-      <Card>
+      <Card style={styles.dashboardHeroCard}>
         <div style={styles.heroHeader}>
           <div>
-            <div style={styles.welcomeText}>Welcome</div>
+            <div style={styles.welcomeText}>MedAuth workspace</div>
             <div style={styles.heroName}>
               WissenMedAuth {isGuest ? "Guest" : roleMeta.label}
+            </div>
+            <div style={styles.dashboardHeroSubtext}>
+              Secure role-based access for medication verification and compliance monitoring.
             </div>
           </div>
           <div style={styles.rolePill}>
             <RoleIcon size={16} color={COLORS.primary} />
             <span>{isGuest ? "Guest" : roleMeta.label}</span>
           </div>
+        </div>
+
+        <div style={styles.kpiGrid}>
+          {dashboardKpis.map((item) => (
+            <div key={item.label} style={styles.kpiCard}>
+              <div style={styles.kpiLabel}>{item.label}</div>
+              <div style={styles.kpiValue}>{item.value}</div>
+              <StatusBadge label={item.trend} tone={item.tone} />
+            </div>
+          ))}
         </div>
 
         <div style={styles.connectionCard}>
@@ -1334,50 +1627,51 @@ function HomeScreen({
         </div>
       </Card>
 
-      <div style={styles.quickGrid}>
-        <QuickAction
-          icon={Camera}
-          label="Scan"
-          onClick={() => onNavigate("scan")}
-        />
-        {!isGuest && (
-          <QuickAction
-            icon={History}
-            label="History"
-            onClick={() => onNavigate("history")}
+      <div style={styles.dashboardCardGrid}>
+        {dashboardCards.map((card, index) => (
+          <DashboardActionCard
+            key={card.title}
+            card={card}
+            index={index}
+            disabled={
+              isGuest && (card.screen === "report" || card.screen === "history")
+            }
+            onClick={() => {
+              if (
+                isGuest &&
+                (card.screen === "report" || card.screen === "history")
+              ) {
+                return;
+              }
+              onNavigate(card.screen);
+            }}
           />
-        )}
-        {!isGuest && (
-          <QuickAction
-            icon={Bell}
-            label="Alerts"
-            onClick={() => onNavigate("alerts")}
-          />
-        )}
-        {!isGuest ? (
-          <QuickAction
-            icon={FileText}
-            label="Reports"
-            onClick={() => onNavigate("reports")}
-          />
-        ) : (
-          <QuickAction
-            icon={Settings}
-            label="Settings"
-            onClick={() => onNavigate("settings")}
-          />
-        )}
+        ))}
       </div>
 
       <Card>
-        <div style={styles.cardTitle}>Core Features</div>
-        <div style={styles.featureList}>
-          {features.map((item) => (
-            <div key={item} style={styles.featureRow}>
-              <CheckCircle2 size={16} color={COLORS.success} />
-              <span>{item}</span>
+        <div style={styles.cardHeaderRow}>
+          <div>
+            <div style={styles.cardTitle}>Operational Snapshot</div>
+            <div style={styles.snapshotSubtext}>
+              Mock prototype data for the selected role dashboard.
             </div>
-          ))}
+          </div>
+          <StatusBadge label="Prototype" tone="primary" />
+        </div>
+        <div style={styles.featureList}>
+          <div style={styles.featureRow}>
+            <CheckCircle2 size={16} color={COLORS.success} />
+            <span>Authentication and role routing are simulated on-device.</span>
+          </div>
+          <div style={styles.featureRow}>
+            <ShieldCheck size={16} color={COLORS.primary} />
+            <span>Verification, alerts, reports, and sync states use mock records.</span>
+          </div>
+          <div style={styles.featureRow}>
+            <Lock size={16} color={COLORS.success} />
+            <span>Designed for medication verification and compliance workflows.</span>
+          </div>
         </div>
       </Card>
 
@@ -1385,6 +1679,63 @@ function HomeScreen({
         <SecondaryButton label="Back" onClick={onGuestBack} icon={ArrowLeft} />
       )}
     </div>
+  );
+}
+
+function DashboardActionCard({ card, index, disabled, onClick }: any) {
+  const Icon = card.icon;
+  const toneStyle = getToneStyle(card.tone);
+
+  return (
+    <button
+      type="button"
+      className="dashboard-action-card"
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        ...styles.dashboardActionCard,
+        animationDelay: `${index * 55}ms`,
+        opacity: disabled ? 0.62 : 1,
+      }}
+    >
+      <div style={styles.dashboardActionTop}>
+        <div
+          style={{
+            ...styles.dashboardIconWrap,
+            background: toneStyle.bg,
+          }}
+        >
+          <Icon size={18} color={toneStyle.color} />
+        </div>
+        <StatusBadge label={card.badge} tone={card.tone} />
+      </div>
+      <div style={styles.dashboardMetric}>{card.metric}</div>
+      <div style={styles.dashboardCardTitle}>{card.title}</div>
+      <div style={styles.dashboardCardDescription}>{card.description}</div>
+    </button>
+  );
+}
+
+function getToneStyle(tone: DashboardCard["tone"]) {
+  if (tone === "success") return { color: COLORS.success, bg: "#EAF8F0" };
+  if (tone === "warning") return { color: COLORS.warning, bg: "#FFF7E8" };
+  if (tone === "danger") return { color: COLORS.danger, bg: "#FDECEC" };
+  if (tone === "neutral") return { color: COLORS.subtext, bg: "#F3F4F6" };
+  return { color: COLORS.primary, bg: "#EEF5FF" };
+}
+
+function StatusBadge({ label, tone }: any) {
+  const toneStyle = getToneStyle(tone || "primary");
+  return (
+    <span
+      style={{
+        ...styles.statusBadge,
+        background: toneStyle.bg,
+        color: toneStyle.color,
+      }}
+    >
+      {label}
+    </span>
   );
 }
 
@@ -1600,9 +1951,33 @@ function ReportsScreen({ reports, roleLabel }: any) {
   );
 }
 
-function SettingsScreen({ roleLabel, name, email, isGuest, onLogout }: any) {
+function SettingsScreen({
+  roleLabel,
+  name,
+  email,
+  isGuest,
+  detail,
+  onOpenDetail,
+  onBack,
+  onLogout,
+  onSignIn,
+  onCreateAccount,
+}: any) {
+  if (detail === "privacy") return <PrivacySecurityScreen />;
+  if (detail === "language") return <LanguagePreferencesScreen />;
+  if (detail === "verification") return <VerificationPreferencesScreen />;
+  if (detail === "guest") {
+    return (
+      <GuestAccessScreen
+        isGuest={isGuest}
+        onSignIn={onSignIn}
+        onCreateAccount={onCreateAccount}
+      />
+    );
+  }
+
   return (
-    <div style={styles.stackGapLg}>
+    <div className="settings-page-motion" style={styles.stackGapLg}>
       <Card>
         <div style={styles.profileHeader}>
           <div style={styles.avatar}>
@@ -1619,9 +1994,30 @@ function SettingsScreen({ roleLabel, name, email, isGuest, onLogout }: any) {
       </Card>
 
       <Card>
-        <SettingRow icon={Lock} label="Privacy and Security" />
-        <SettingRow icon={Globe} label="Language Preferences" />
-        <SettingRow icon={ShieldCheck} label="Verification Preferences" />
+        <SettingRow
+          icon={Lock}
+          label="Privacy and Security"
+          description="Permissions, privacy notice, and account protection"
+          onClick={() => onOpenDetail("privacy")}
+        />
+        <SettingRow
+          icon={Globe}
+          label="Language Preferences"
+          description="Language, locale, and date display choices"
+          onClick={() => onOpenDetail("language")}
+        />
+        <SettingRow
+          icon={ShieldCheck}
+          label="Verification Preferences"
+          description="Scan feedback, result detail, and history behavior"
+          onClick={() => onOpenDetail("verification")}
+        />
+        <SettingRow
+          icon={User}
+          label="Guest Access"
+          description="See what works before account registration"
+          onClick={() => onOpenDetail("guest")}
+        />
       </Card>
 
       <SecondaryButton
@@ -1629,6 +2025,375 @@ function SettingsScreen({ roleLabel, name, email, isGuest, onLogout }: any) {
         onClick={onLogout}
         icon={LogOut}
       />
+    </div>
+  );
+}
+
+function PrivacySecurityScreen() {
+  const [camera, setCamera] = useState(true);
+  const [notifications, setNotifications] = useState(true);
+  const [location, setLocation] = useState("While Using App");
+  const [storage, setStorage] = useState("Encrypted on device");
+  const [sessionSecurity, setSessionSecurity] = useState(true);
+  const [biometric, setBiometric] = useState(false);
+
+  return (
+    <SettingsDetailShell
+      title="Privacy and Security"
+      subtitle="Control device permissions, session protection, and how MedAuth handles verification data."
+    >
+      <Card>
+        <ToggleRow
+          icon={Camera}
+          label="Camera Permission"
+          description="Allow barcode and package image scanning from the secure verification flow."
+          checked={camera}
+          onChange={setCamera}
+        />
+        <ToggleRow
+          icon={Bell}
+          label="Notification Permission"
+          description="Receive product warnings, sync reminders, and account security updates."
+          checked={notifications}
+          onChange={setNotifications}
+        />
+        <SelectRow
+          icon={MapPin}
+          label="Location Access"
+          description="Attach a region to suspicious product reports when allowed."
+          value={location}
+          onChange={setLocation}
+          options={["Never", "While Using App", "Ask Every Time"]}
+        />
+      </Card>
+
+      <Card>
+        <SelectRow
+          icon={Database}
+          label="Data Storage"
+          description="Choose how verification history is retained on this device."
+          value={storage}
+          onChange={setStorage}
+          options={["Encrypted on device", "Cloud sync enabled", "Do not store history"]}
+        />
+        <ToggleRow
+          icon={Lock}
+          label="Session Security"
+          description="Require a fresh security check after inactivity."
+          checked={sessionSecurity}
+          onChange={setSessionSecurity}
+        />
+        <ToggleRow
+          icon={Fingerprint}
+          label="Biometric Login"
+          description="Use Face ID, Touch ID, or supported device biometrics for faster sign in."
+          checked={biometric}
+          onChange={setBiometric}
+        />
+      </Card>
+
+      <Card style={styles.noticeCard}>
+        <div style={styles.detailCardTitle}>Privacy Notice</div>
+        <div style={styles.detailDescription}>
+          MedAuth uses permission access only to support medicine verification,
+          safety alerts, account security, and compliance-ready activity records.
+        </div>
+      </Card>
+    </SettingsDetailShell>
+  );
+}
+
+function LanguagePreferencesScreen() {
+  const [appLanguage, setAppLanguage] = useState("English");
+  const [resultLanguage, setResultLanguage] = useState("Match app language");
+  const [terminology, setTerminology] = useState("Consumer-friendly");
+  const [locale, setLocale] = useState("United States");
+  const [dateFormat, setDateFormat] = useState("Apr 26, 2026 • 9:41 AM");
+  const [saved, setSaved] = useState(false);
+
+  const savePreference = () => {
+    setSaved(true);
+    window.setTimeout(() => setSaved(false), 1400);
+  };
+
+  return (
+    <SettingsDetailShell
+      title="Language Preferences"
+      subtitle="Personalize language, regional formatting, and medical wording across MedAuth."
+    >
+      <Card>
+        <SelectRow
+          icon={Languages}
+          label="App Language"
+          description="Set the language used for navigation and account screens."
+          value={appLanguage}
+          onChange={setAppLanguage}
+          options={["English", "Filipino", "Spanish", "French"]}
+        />
+        <SelectRow
+          icon={Globe}
+          label="Result Language"
+          description="Choose how verification results and safety guidance are shown."
+          value={resultLanguage}
+          onChange={setResultLanguage}
+          options={["Match app language", "English", "Local language"]}
+        />
+        <SelectRow
+          icon={Stethoscope}
+          label="Medical Terminology Style"
+          description="Adjust terminology for everyday use or professional workflows."
+          value={terminology}
+          onChange={setTerminology}
+          options={["Consumer-friendly", "Clinical", "Pharmacy operations"]}
+        />
+      </Card>
+
+      <Card>
+        <SelectRow
+          icon={MapPin}
+          label="Region / Locale"
+          description="Set regional defaults for alerts, compliance records, and display labels."
+          value={locale}
+          onChange={setLocale}
+          options={["United States", "Philippines", "European Union", "United Kingdom"]}
+        />
+        <SelectRow
+          icon={History}
+          label="Date and Time Format"
+          description="Choose how timestamps appear in results, history, and reports."
+          value={dateFormat}
+          onChange={setDateFormat}
+          options={["Apr 26, 2026 • 9:41 AM", "26 Apr 2026 • 09:41", "2026-04-26 • 09:41"]}
+        />
+      </Card>
+
+      <PrimaryButton
+        label={saved ? "Preference Saved" : "Save Preference"}
+        onClick={savePreference}
+        icon={Save}
+      />
+    </SettingsDetailShell>
+  );
+}
+
+function VerificationPreferencesScreen() {
+  const [mode, setMode] = useState("Scan barcode first");
+  const [detailedResult, setDetailedResult] = useState(true);
+  const [blockchainStatus, setBlockchainStatus] = useState(true);
+  const [scanSound, setScanSound] = useState(false);
+  const [vibration, setVibration] = useState(true);
+  const [autoSave, setAutoSave] = useState(true);
+  const [warningSensitivity, setWarningSensitivity] = useState("Balanced");
+  const [offlineReminder, setOfflineReminder] = useState(true);
+
+  return (
+    <SettingsDetailShell
+      title="Verification Preferences"
+      subtitle="Tune the way scans, verification results, alerts, and offline reminders behave."
+    >
+      <Card>
+        <SelectRow
+          icon={SlidersHorizontal}
+          label="Default Verification Mode"
+          description="Choose the first method shown when opening medication verification."
+          value={mode}
+          onChange={setMode}
+          options={["Scan barcode first", "Manual code entry", "Package photo review"]}
+        />
+        <ToggleRow
+          icon={FileText}
+          label="Show Detailed Result"
+          description="Display manufacturer, batch, expiry, and confidence details after each scan."
+          checked={detailedResult}
+          onChange={setDetailedResult}
+        />
+        <ToggleRow
+          icon={ShieldCheck}
+          label="Show Blockchain Status"
+          description="Show chain-of-custody status when records are available."
+          checked={blockchainStatus}
+          onChange={setBlockchainStatus}
+        />
+      </Card>
+
+      <Card>
+        <ToggleRow
+          icon={Volume2}
+          label="Enable Scan Sound"
+          description="Play a soft confirmation tone after a successful scan."
+          checked={scanSound}
+          onChange={setScanSound}
+        />
+        <ToggleRow
+          icon={Wifi}
+          label="Enable Vibration Feedback"
+          description="Use haptics for verified, warning, and blocked scan outcomes."
+          checked={vibration}
+          onChange={setVibration}
+        />
+        <ToggleRow
+          icon={History}
+          label="Auto Save Verification History"
+          description="Keep a secure local record of completed verification activity."
+          checked={autoSave}
+          onChange={setAutoSave}
+        />
+      </Card>
+
+      <Card>
+        <SelectRow
+          icon={TriangleAlert}
+          label="Warning Sensitivity"
+          description="Control how quickly MedAuth raises caution messages."
+          value={warningSensitivity}
+          onChange={setWarningSensitivity}
+          options={["Standard", "Balanced", "High sensitivity"]}
+        />
+        <ToggleRow
+          icon={WifiOff}
+          label="Offline Result Reminder"
+          description="Remind users when a result was generated from cached data."
+          checked={offlineReminder}
+          onChange={setOfflineReminder}
+        />
+      </Card>
+    </SettingsDetailShell>
+  );
+}
+
+function GuestAccessScreen({ isGuest, onSignIn, onCreateAccount }: any) {
+  return (
+    <SettingsDetailShell
+      title="Guest Access"
+      subtitle="Preview the medication verification experience and unlock more tools with a registered account."
+    >
+      <Card style={styles.guestAccessSummaryCard}>
+        <div style={styles.detailCardTitle}>Current Access Level</div>
+        <div style={styles.guestAccessLevel}>
+          {isGuest ? "Guest verification" : "Registered account"}
+        </div>
+        <div style={styles.detailDescription}>
+          {isGuest
+            ? "Guest mode keeps access lightweight for quick medication scans."
+            : "Your account includes saved activity, reporting, alerts, and role-based workspace tools."}
+        </div>
+      </Card>
+
+      <Card>
+        <div style={styles.detailCardTitle}>Available in Guest Mode</div>
+        <CapabilityRow label="Medication barcode scanning" available />
+        <CapabilityRow label="Basic authenticity result" available />
+        <CapabilityRow label="Offline result notice" available />
+        <CapabilityRow label="Core privacy and language settings" available />
+      </Card>
+
+      <Card>
+        <div style={styles.detailCardTitle}>Unavailable in Guest Mode</div>
+        <CapabilityRow label="Saved verification history" />
+        <CapabilityRow label="Incident reports and evidence uploads" />
+        <CapabilityRow label="Role-based alerts and compliance reports" />
+        <CapabilityRow label="Cloud sync across authorized devices" />
+      </Card>
+
+      <Card style={styles.noticeCard}>
+        <div style={styles.detailCardTitle}>Why Register</div>
+        <div style={styles.detailDescription}>
+          Registration protects safety records, unlocks reporting tools, and
+          connects verification activity to the right healthcare role.
+        </div>
+      </Card>
+
+      <div style={styles.settingsActionGrid}>
+        <SecondaryButton label="Sign In" onClick={onSignIn} icon={Lock} />
+        <PrimaryButton label="Create Account" onClick={onCreateAccount} icon={User} />
+      </div>
+    </SettingsDetailShell>
+  );
+}
+
+function SettingsDetailShell({ title, subtitle, children }: any) {
+  return (
+    <div className="settings-page-motion" style={styles.stackGapLg}>
+      <Card style={styles.settingsHeroCard}>
+        <div style={styles.detailKicker}>MedAuth settings</div>
+        <h2 style={styles.detailTitle}>{title}</h2>
+        <p style={styles.detailSubtitle}>{subtitle}</p>
+      </Card>
+      {children}
+    </div>
+  );
+}
+
+function ToggleRow({ icon: Icon, label, description, checked, onChange }: any) {
+  return (
+    <div style={styles.preferenceRow}>
+      <div style={styles.preferenceLeft}>
+        <div style={styles.preferenceIcon}>
+          <Icon size={16} color={COLORS.primary} />
+        </div>
+        <div>
+          <div style={styles.preferenceLabel}>{label}</div>
+          <div style={styles.preferenceDescription}>{description}</div>
+        </div>
+      </div>
+      <button
+        type="button"
+        aria-label={label}
+        aria-pressed={checked}
+        className="setting-toggle"
+        onClick={() => onChange(!checked)}
+        style={{
+          ...styles.switchTrack,
+          background: checked ? COLORS.primary : "#CBD5E1",
+        }}
+      >
+        <span
+          style={{
+            ...styles.switchThumb,
+            transform: checked ? "translateX(18px)" : "translateX(0)",
+          }}
+        />
+      </button>
+    </div>
+  );
+}
+
+function SelectRow({ icon: Icon, label, description, value, onChange, options }: any) {
+  return (
+    <div style={styles.preferenceRow}>
+      <div style={styles.preferenceLeft}>
+        <div style={styles.preferenceIcon}>
+          <Icon size={16} color={COLORS.primary} />
+        </div>
+        <div>
+          <div style={styles.preferenceLabel}>{label}</div>
+          <div style={styles.preferenceDescription}>{description}</div>
+          <select
+            value={value}
+            onChange={(event) => onChange(event.target.value)}
+            style={styles.settingsSelect}
+          >
+            {options.map((option: string) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CapabilityRow({ label, available = false }: any) {
+  return (
+    <div style={styles.capabilityRow}>
+      {available ? (
+        <CheckCircle2 size={16} color={COLORS.success} />
+      ) : (
+        <X size={16} color={COLORS.danger} />
+      )}
+      <span>{label}</span>
     </div>
   );
 }
@@ -1695,6 +2460,8 @@ function AiAssistant({
               <span>{screen}</span>
             </div>
           </div>
+
+          <div style={styles.aiPrototypeNotice}>{AI_PROTOTYPE_LABEL}</div>
 
           <div style={styles.aiMessages}>
             {messages.map((message: ChatMessage) => (
@@ -1954,19 +2721,24 @@ function InfoRow({ label, value }: any) {
   );
 }
 
-function SettingRow({ icon: Icon, label }: any) {
+function SettingRow({ icon: Icon, label, description, onClick }: any) {
   return (
-    <div style={styles.settingRow}>
+    <button type="button" className="setting-row-button" onClick={onClick} style={styles.settingRow}>
       <div style={styles.settingLeft}>
-        <Icon size={16} color={COLORS.primary} />
-        <span>{label}</span>
+        <div style={styles.settingIconBox}>
+          <Icon size={16} color={COLORS.primary} />
+        </div>
+        <span style={styles.settingTextStack}>
+          <span>{label}</span>
+          <span style={styles.settingDescription}>{description}</span>
+        </span>
       </div>
       <ArrowLeft
         size={14}
         color={COLORS.subtext}
         style={{ transform: "rotate(180deg)" }}
       />
-    </div>
+    </button>
   );
 }
 
@@ -2116,6 +2888,20 @@ const styles: Record<string, CSSProperties> = {
     color: COLORS.subtext,
     fontSize: 13,
     lineHeight: 1.4,
+  },
+  loginSecurityMessage: {
+    borderRadius: 8,
+    border: "1px solid rgba(47, 128, 237, 0.14)",
+    background: "rgba(255,255,255,0.76)",
+    color: COLORS.text,
+    display: "flex",
+    alignItems: "flex-start",
+    gap: 8,
+    padding: "10px 11px",
+    fontSize: 12,
+    fontWeight: 800,
+    lineHeight: 1.35,
+    boxShadow: "0 8px 18px rgba(15, 23, 42, 0.04)",
   },
   enterpriseStatusRow: {
     display: "grid",
@@ -2309,7 +3095,7 @@ const styles: Record<string, CSSProperties> = {
   },
   card: {
     background: COLORS.card,
-    borderRadius: 22,
+    borderRadius: 8,
     border: `1px solid ${COLORS.border}`,
     padding: 16,
     boxShadow: "0 10px 24px rgba(15, 23, 42, 0.05)",
@@ -2437,6 +3223,11 @@ const styles: Record<string, CSSProperties> = {
     alignItems: "flex-start",
     gap: 10,
   },
+  dashboardHeroCard: {
+    borderRadius: 8,
+    background:
+      "linear-gradient(180deg, rgba(255,255,255,0.98), rgba(247,252,255,0.98))",
+  },
   welcomeText: {
     color: COLORS.subtext,
     fontSize: 13,
@@ -2446,6 +3237,13 @@ const styles: Record<string, CSSProperties> = {
     fontSize: 22,
     fontWeight: 800,
     marginTop: 4,
+  },
+  dashboardHeroSubtext: {
+    color: COLORS.subtext,
+    fontSize: 12,
+    lineHeight: 1.45,
+    marginTop: 8,
+    maxWidth: 230,
   },
   rolePill: {
     display: "flex",
@@ -2457,6 +3255,34 @@ const styles: Record<string, CSSProperties> = {
     color: COLORS.primary,
     fontSize: 12,
     fontWeight: 700,
+  },
+  kpiGrid: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr 1fr",
+    gap: 8,
+    marginTop: 16,
+  },
+  kpiCard: {
+    borderRadius: 8,
+    border: `1px solid ${COLORS.border}`,
+    background: COLORS.card,
+    padding: 10,
+    minHeight: 88,
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "space-between",
+    gap: 6,
+  },
+  kpiLabel: {
+    color: COLORS.subtext,
+    fontSize: 11,
+    fontWeight: 800,
+  },
+  kpiValue: {
+    color: COLORS.text,
+    fontSize: 18,
+    fontWeight: 900,
+    lineHeight: 1.1,
   },
   connectionCard: {
     marginTop: 16,
@@ -2487,6 +3313,59 @@ const styles: Record<string, CSSProperties> = {
     alignItems: "center",
     justifyContent: "center",
     cursor: "pointer",
+  },
+  dashboardCardGrid: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: 10,
+  },
+  dashboardActionCard: {
+    minHeight: 178,
+    borderRadius: 8,
+    border: `1px solid ${COLORS.border}`,
+    background: COLORS.card,
+    color: COLORS.text,
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "stretch",
+    justifyContent: "flex-start",
+    gap: 8,
+    padding: 12,
+    textAlign: "left",
+    cursor: "pointer",
+    boxShadow: "0 10px 22px rgba(15, 23, 42, 0.05)",
+  },
+  dashboardActionTop: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  dashboardIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 8,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  dashboardMetric: {
+    fontSize: 22,
+    fontWeight: 900,
+    lineHeight: 1.05,
+    marginTop: 2,
+  },
+  dashboardCardTitle: {
+    fontSize: 13,
+    fontWeight: 900,
+    lineHeight: 1.25,
+  },
+  dashboardCardDescription: {
+    color: COLORS.subtext,
+    fontSize: 11,
+    fontWeight: 650,
+    lineHeight: 1.42,
   },
   quickGrid: {
     display: "grid",
@@ -2523,6 +3402,19 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 800,
     fontSize: 16,
     marginBottom: 12,
+  },
+  cardHeaderRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 12,
+    marginBottom: 12,
+  },
+  snapshotSubtext: {
+    color: COLORS.subtext,
+    fontSize: 12,
+    lineHeight: 1.35,
+    marginTop: -6,
   },
   featureList: {
     display: "flex",
@@ -2636,8 +3528,8 @@ const styles: Record<string, CSSProperties> = {
   },
   statusBadge: {
     borderRadius: 999,
-    padding: "8px 10px",
-    fontSize: 12,
+    padding: "6px 8px",
+    fontSize: 11,
     fontWeight: 800,
     whiteSpace: "nowrap",
   },
@@ -2680,17 +3572,184 @@ const styles: Record<string, CSSProperties> = {
     fontSize: 20,
   },
   settingRow: {
+    width: "100%",
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
+    gap: 12,
     padding: "14px 0",
     borderBottom: `1px solid ${COLORS.border}`,
+    background: "transparent",
+    color: COLORS.text,
+    cursor: "pointer",
+    textAlign: "left",
   },
   settingLeft: {
     display: "flex",
+    alignItems: "flex-start",
+    gap: 12,
+    fontWeight: 600,
+    minWidth: 0,
+    flex: 1,
+  },
+  settingIconBox: {
+    width: 34,
+    height: 34,
+    borderRadius: 8,
+    background: "#EEF5FF",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  settingTextStack: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 4,
+    minWidth: 0,
+    fontSize: 14,
+    fontWeight: 800,
+  },
+  settingDescription: {
+    color: COLORS.subtext,
+    fontSize: 12,
+    fontWeight: 650,
+    lineHeight: 1.35,
+  },
+  settingsHeroCard: {
+    background:
+      "linear-gradient(135deg, rgba(255,255,255,0.98), rgba(239,249,246,0.96))",
+    borderColor: "rgba(47, 128, 237, 0.12)",
+  },
+  detailKicker: {
+    color: COLORS.success,
+    fontSize: 11,
+    fontWeight: 900,
+    textTransform: "uppercase",
+    marginBottom: 6,
+  },
+  detailTitle: {
+    margin: 0,
+    fontSize: 22,
+    fontWeight: 900,
+    lineHeight: 1.15,
+  },
+  detailSubtitle: {
+    margin: "8px 0 0 0",
+    color: COLORS.subtext,
+    fontSize: 13,
+    lineHeight: 1.45,
+    fontWeight: 600,
+  },
+  detailCardTitle: {
+    fontWeight: 900,
+    fontSize: 15,
+    marginBottom: 8,
+  },
+  detailDescription: {
+    color: COLORS.subtext,
+    fontSize: 13,
+    lineHeight: 1.55,
+    fontWeight: 600,
+  },
+  preferenceRow: {
+    display: "flex",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
+    padding: "14px 0",
+    borderBottom: `1px solid ${COLORS.border}`,
+  },
+  preferenceLeft: {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: 12,
+    flex: 1,
+    minWidth: 0,
+  },
+  preferenceIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 8,
+    background: "#EEF5FF",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  preferenceLabel: {
+    fontSize: 14,
+    fontWeight: 900,
+    lineHeight: 1.25,
+  },
+  preferenceDescription: {
+    color: COLORS.subtext,
+    fontSize: 12,
+    lineHeight: 1.4,
+    fontWeight: 650,
+    marginTop: 4,
+  },
+  switchTrack: {
+    width: 44,
+    height: 26,
+    borderRadius: 999,
+    border: "none",
+    padding: 3,
+    display: "flex",
+    alignItems: "center",
+    cursor: "pointer",
+    flexShrink: 0,
+  },
+  switchThumb: {
+    width: 20,
+    height: 20,
+    borderRadius: 999,
+    background: COLORS.card,
+    boxShadow: "0 2px 6px rgba(15, 23, 42, 0.18)",
+    transition: "transform 180ms ease",
+  },
+  settingsSelect: {
+    width: "100%",
+    minHeight: 42,
+    marginTop: 10,
+    borderRadius: 8,
+    border: `1px solid ${COLORS.border}`,
+    background: "#FBFCFD",
+    color: COLORS.text,
+    padding: "0 10px",
+    fontSize: 13,
+    fontWeight: 750,
+    outline: "none",
+  },
+  noticeCard: {
+    background: "#F8FBFF",
+    borderColor: "rgba(47, 128, 237, 0.16)",
+  },
+  guestAccessSummaryCard: {
+    background:
+      "linear-gradient(135deg, rgba(238,245,255,0.96), rgba(234,248,240,0.94))",
+    borderColor: "rgba(39, 174, 96, 0.18)",
+  },
+  guestAccessLevel: {
+    color: COLORS.primary,
+    fontSize: 20,
+    fontWeight: 900,
+    marginBottom: 6,
+  },
+  capabilityRow: {
+    display: "flex",
     alignItems: "center",
     gap: 10,
-    fontWeight: 600,
+    padding: "9px 0",
+    color: COLORS.text,
+    fontSize: 13,
+    fontWeight: 750,
+    lineHeight: 1.35,
+  },
+  settingsActionGrid: {
+    display: "grid",
+    gridTemplateColumns: "1fr",
+    gap: 10,
   },
   bottomNav: {
     minHeight: 82,
@@ -2832,6 +3891,18 @@ const styles: Record<string, CSSProperties> = {
     overflow: "hidden",
     whiteSpace: "nowrap",
     textOverflow: "ellipsis",
+  },
+  aiPrototypeNotice: {
+    position: "relative",
+    margin: "0 14px 10px 14px",
+    borderRadius: 12,
+    border: "1px solid rgba(242, 169, 59, 0.28)",
+    background: "rgba(255, 247, 232, 0.82)",
+    color: COLORS.text,
+    padding: "8px 10px",
+    fontSize: 11,
+    fontWeight: 800,
+    lineHeight: 1.3,
   },
   aiMessages: {
     position: "relative",
